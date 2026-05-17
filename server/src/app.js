@@ -18,7 +18,11 @@ const parseOrigins = (value) =>
     .map((origin) => origin.trim())
     .filter(Boolean);
 
-const defaultOrigins = ["http://localhost:5173", "https://dengueshield-ai.onrender.com"];
+const defaultOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "https://dengueshield-ai.onrender.com",
+];
 const envOrigins = parseOrigins(process.env.CLIENT_URL || "");
 const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
@@ -55,6 +59,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/hospitals", hospitalRoutes);
 app.use("/api/rag", require("./routes/ragRoutes"));
+app.use("/api/speech", require("./routes/speechRoutes"));
 
 
 
