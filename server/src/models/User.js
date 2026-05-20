@@ -9,7 +9,6 @@ const UserSchema = new mongoose.Schema(
     role: { type: String, enum: ["admin", "user"], default: "user" },
     isActive: { type: Boolean, default: true },
     disabledAt: { type: Date, default: null },
-    preferredLanguage: { type: String, enum: ["en", "bn"], default: "en" },
     pregnancyStatus: { type: Boolean, default: false },
     age: { type: Number },
     weight: { type: Number },

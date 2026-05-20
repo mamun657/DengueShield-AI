@@ -67,6 +67,19 @@ const DashboardNavbar = ({ userName, userRole, onLogout, onOpenSmartDoctor }) =>
           🩺 Smart Doctor
         </button>
 
+        <NavLink
+          to="/graphrag"
+          className={({ isActive }) =>
+            `rounded-lg px-4 py-2 transition-all duration-300 ${
+              isActive
+                ? "bg-[#1e293b]/80 text-white shadow-[0_0_12px_rgba(34,211,238,0.12)] ring-1 ring-cyan-500/30 font-medium"
+                : "text-slate-400 font-normal hover:bg-white/5 hover:text-white"
+            }`
+          }
+        >
+          ◈ GraphRAG
+        </NavLink>
+
         <NavLink 
           to="/reports" 
           className={({ isActive }) => 

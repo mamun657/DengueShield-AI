@@ -13,8 +13,8 @@ const Footer = () => {
         <div className="mb-10 grid gap-4 rounded-3xl border border-[#d7e6ee30] bg-gradient-to-r from-[#e8f5f916] to-[#d5f0ea0f] p-5 md:grid-cols-[1.2fr_0.8fr] md:p-6">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-cyan-200/70">Health Alerts Newsletter</p>
-            <h4 className="mt-2 text-xl font-semibold text-white">Get outbreak insights and prevention guidance</h4>
-            <p className="mt-2 text-sm text-slate-400">Weekly clinical updates tailored for dengue-prone regions in Bangladesh.</p>
+            <h4 className="mt-2 text-xl font-semibold text-white">Get clinical insights and prevention guidance</h4>
+            <p className="mt-2 text-sm text-slate-400">Weekly health updates tailored for families and care teams in Bangladesh.</p>
           </div>
           <form className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end" onSubmit={(e) => e.preventDefault()}>
             <input

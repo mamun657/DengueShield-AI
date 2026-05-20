@@ -11,6 +11,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import FamilyViewPage from "./pages/FamilyViewPage";
 import ProfilePage from "./pages/ProfilePage";
 import ReportsPage from "./pages/ReportsPage";
+import GraphRagPage from "./pages/GraphRagPage";
 
 
 const Nav = () => {
@@ -58,7 +59,10 @@ const Nav = () => {
 
 const AppLayout = () => {
   const location = useLocation();
-  const hideGlobalNav = location.pathname === "/dashboard" || location.pathname === "/profile";
+  const hideGlobalNav =
+    location.pathname === "/dashboard" ||
+    location.pathname === "/profile" ||
+    location.pathname === "/graphrag";
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#061120] text-slate-100">
@@ -94,6 +98,14 @@ const AppLayout = () => {
             }
           />
           <Route path="/reports" element={<ReportsPage />} />
+          <Route
+            path="/graphrag"
+            element={
+              <ProtectedRoute>
+                <GraphRagPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/family/:token" element={<FamilyViewPage />} />
         </Routes>
 

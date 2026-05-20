@@ -60,6 +60,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/hospitals", hospitalRoutes);
 app.use("/api/rag", require("./routes/ragRoutes"));
 app.use("/api/speech", require("./routes/speechRoutes"));
+app.use("/api/graphrag", require("./routes/graphRagRoutes"));
 
 
 

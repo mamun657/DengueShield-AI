@@ -1,0 +1,73 @@
+/**
+ * WHO-aligned dengue knowledge graph — canonical edges for seed + in-memory fallback.
+ * GraphRAG uses relationships (not just document chunks) for explainable clinical pathways.
+ */
+module.exports = {
+  symptoms: [
+    { id: "fever_drop", name: "Fever Drop (Defervescence)" },
+    { id: "abdominal_pain", name: "Abdominal Pain" },
+    { id: "vomiting", name: "Persistent Vomiting" },
+    { id: "bleeding", name: "Bleeding / Hemorrhagic Signs" },
+    { id: "rash", name: "Skin Rash" },
+    { id: "dehydration", name: "Dehydration" },
+    { id: "headache", name: "Severe Headache" },
+    { id: "eye_pain", name: "Eye Pain" },
+    { id: "fatigue", name: "Fatigue / Weakness" },
+  ],
+  risks: [
+    { id: "critical_phase", name: "Dengue Critical Phase", level: "critical" },
+    { id: "severe_dengue", name: "Severe Dengue", level: "high" },
+    { id: "shock", name: "Dengue Shock Syndrome", level: "critical" },
+    { id: "dehydration_risk", name: "Dehydration Risk", level: "moderate" },
+  ],
+  whoWarnings: [
+    { id: "warning_sign", name: "WHO Warning Sign", category: "warning" },
+    { id: "emergency_sign", name: "WHO Emergency Sign", category: "emergency" },
+  ],
+  actions: [
+    { id: "hospitalization", name: "Hospital Observation", priority: "high" },
+    { id: "hydration", name: "Oral / IV Hydration", priority: "medium" },
+    { id: "CBC_test", name: "CBC & Platelet Monitoring", priority: "medium" },
+    { id: "emergency_referral", name: "Emergency Referral", priority: "critical" },
+    { id: "platelet_monitoring", name: "Platelet Monitoring", priority: "high" },
+  ],
+  severities: [
+    { id: "severity_high", name: "High Severity" },
+    { id: "severity_moderate", name: "Moderate Severity" },
+    { id: "severity_low", name: "Low Severity" },
+  ],
+  recommendations: [
+    { id: "rec_hospital_obs", text: "Immediate hospital observation recommended" },
+    { id: "rec_emergency", text: "Emergency department referral required" },
+    { id: "rec_hydration", text: "Increase fluid intake and monitor urine output" },
+  ],
+  hospitals: [{ id: "hospital_referral", name: "Nearest Dengue-Capable Hospital" }],
+  edges: [
+    { from: "fever_drop", fromLabel: "Symptom", rel: "INDICATES", to: "critical_phase", toLabel: "Risk" },
+    { from: "abdominal_pain", fromLabel: "Symptom", rel: "CLASSIFIED_AS", to: "warning_sign", toLabel: "WHO_Warning" },
+    { from: "vomiting", fromLabel: "Symptom", rel: "CLASSIFIED_AS", to: "warning_sign", toLabel: "WHO_Warning" },
+    { from: "vomiting", fromLabel: "Symptom", rel: "INDICATES", to: "dehydration_risk", toLabel: "Risk" },
+    { from: "bleeding", fromLabel: "Symptom", rel: "TRIGGERS", to: "emergency_referral", toLabel: "Action" },
+    { from: "bleeding", fromLabel: "Symptom", rel: "CLASSIFIED_AS", to: "emergency_sign", toLabel: "WHO_Warning" },
+    { from: "bleeding", fromLabel: "Symptom", rel: "INDICATES", to: "severe_dengue", toLabel: "Risk" },
+    { from: "rash", fromLabel: "Symptom", rel: "RELATED_TO", to: "severe_dengue", toLabel: "Risk" },
+    { from: "dehydration", fromLabel: "Symptom", rel: "HAS_RISK", to: "dehydration_risk", toLabel: "Risk" },
+    { from: "headache", fromLabel: "Symptom", rel: "RELATED_TO", to: "severe_dengue", toLabel: "Risk" },
+    { from: "eye_pain", fromLabel: "Symptom", rel: "RELATED_TO", to: "severe_dengue", toLabel: "Risk" },
+    { from: "fatigue", fromLabel: "Symptom", rel: "RELATED_TO", to: "critical_phase", toLabel: "Risk" },
+    { from: "warning_sign", fromLabel: "WHO_Warning", rel: "REQUIRES", to: "hospitalization", toLabel: "Action" },
+    { from: "emergency_sign", fromLabel: "WHO_Warning", rel: "REQUIRES", to: "emergency_referral", toLabel: "Action" },
+    { from: "critical_phase", fromLabel: "Risk", rel: "NEEDS", to: "hospitalization", toLabel: "Action" },
+    { from: "critical_phase", fromLabel: "Risk", rel: "NEEDS", to: "platelet_monitoring", toLabel: "Action" },
+    { from: "severe_dengue", fromLabel: "Risk", rel: "NEEDS", to: "CBC_test", toLabel: "Action" },
+    { from: "dehydration_risk", fromLabel: "Risk", rel: "NEEDS", to: "hydration", toLabel: "Action" },
+    { from: "shock", fromLabel: "Risk", rel: "TRIGGERS", to: "emergency_referral", toLabel: "Action" },
+    { from: "hospitalization", fromLabel: "Action", rel: "REFER_TO", to: "hospital_referral", toLabel: "Hospital" },
+    { from: "emergency_referral", fromLabel: "Action", rel: "REFER_TO", to: "hospital_referral", toLabel: "Hospital" },
+    { from: "critical_phase", fromLabel: "Risk", rel: "CLASSIFIED_AS", to: "severity_high", toLabel: "Severity" },
+    { from: "severe_dengue", fromLabel: "Risk", rel: "CLASSIFIED_AS", to: "severity_high", toLabel: "Severity" },
+    { from: "hospitalization", fromLabel: "Action", rel: "RELATED_TO", to: "rec_hospital_obs", toLabel: "Recommendation" },
+    { from: "emergency_referral", fromLabel: "Action", rel: "RELATED_TO", to: "rec_emergency", toLabel: "Recommendation" },
+    { from: "hydration", fromLabel: "Action", rel: "RELATED_TO", to: "rec_hydration", toLabel: "Recommendation" },
+  ],
+};

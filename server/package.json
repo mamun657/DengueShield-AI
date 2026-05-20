@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "graph:seed": "node src/graph/seedKnowledgeGraph.js",
     "test": "echo \"No tests yet\""
   },
   "keywords": [],
@@ -24,8 +25,10 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.0",
+    "neo4j-driver": "^5.28.1",
     "morgan": "^1.10.1",
     "multer": "^2.1.1",
+    "neo4j-driver": "^6.0.1",
     "onnxruntime-node": "^1.14.0",
     "uuid": "^14.0.0"
   },

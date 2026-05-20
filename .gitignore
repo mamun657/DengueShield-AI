@@ -1,7 +1,7 @@
 node_modules
-.venv
 .venv311
+venv
+.env
 dist
 build
-__pycache__
-.env
+

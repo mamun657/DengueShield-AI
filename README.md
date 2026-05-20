@@ -69,6 +69,22 @@ DengueShield/
 - `GET /api/admin/users` (admin)
 - `GET /api/admin/records` (admin)
 - `GET /api/hospitals/nearby?lat=...&lng=...`
+- `POST /api/graphrag/analyze` — hybrid GraphRAG clinical intelligence
+- `GET /api/graphrag/graph` — knowledge graph visualization data
+- `GET /api/graphrag/health`
+
+## GraphRAG Clinical Intelligence
+
+Enterprise GraphRAG layer: Neo4j WHO-aligned knowledge graph + XGBoost + RAG + Groq reasoning.
+
+See **[docs/GRAPHRAG_ARCHITECTURE.md](docs/GRAPHRAG_ARCHITECTURE.md)** for setup, seeding, and API details.
+
+```bash
+docker compose up neo4j -d
+cd server && npm run graph:seed
+```
+
+UI: http://localhost:5173/graphrag
 
 ## Run Locally
 
