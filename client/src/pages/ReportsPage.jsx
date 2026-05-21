@@ -6,6 +6,7 @@ import DashboardNavbar from "../components/DashboardNavbar";
 import RiskSummary from "../components/RiskSummary";
 import TrendChart from "../components/TrendChart";
 import MedicalReportDownload from "../components/MedicalReportDownload";
+import { normalizeTrackingRecords } from "../utils/tracking";
 
 const demoReport = {
   riskScore: 81,
@@ -27,11 +28,6 @@ const demoPatient = {
   updatedAt: new Date().toISOString(),
 };
 
-const demoTracking = [
-  { date: new Date(Date.now() - 2 * 86400000).toISOString(), temperature: 103, risk_score: 35, fluid: 0.8, dayOfIllness: 3, symptoms: ["Headache"] },
-  { date: new Date(Date.now() - 1 * 86400000).toISOString(), temperature: 101, risk_score: 68, fluid: 0.9, dayOfIllness: 4, symptoms: ["Vomiting"] },
-  { date: new Date().toISOString(), temperature: 99, risk_score: 91, fluid: 1.0, dayOfIllness: 5, symptoms: ["Bleeding"] },
-];
 
 const ReportsPage = () => {
   const { t } = useTranslation();
@@ -52,20 +48,19 @@ const ReportsPage = () => {
         // Backend contracts in this repo:
         // - GET /reports returns "top reports" array (DashboardPage uses it).
         // - GET /reports/history returns full history.
-        // Tracking records are stored/handled by DashboardPage; fallback to demo.
-        const [reportsRes, historyRes] = await Promise.all([
+        // - GET /health/dashboard returns health records for trends.
+        const [reportsRes, historyRes, dashboardRes] = await Promise.all([
           api.get("/reports"),
           api.get("/reports/history"),
+          api.get("/health/dashboard"),
         ]);
 
         const reports = Array.isArray(reportsRes?.data) ? reportsRes.data : [];
         setLatestReport(reports[0] || null);
         setHistory(Array.isArray(historyRes?.data) ? historyRes.data : []);
 
-        // If backend also returns tracking data embedded in report/history, attempt best-effort extraction.
-        // Otherwise, keep demo/fallback.
-        const maybeTracking = reports[0]?.trackingRecords || reports[0]?.tracking || [];
-        setTrackingRecords(Array.isArray(maybeTracking) ? maybeTracking : []);
+        const records = Array.isArray(dashboardRes?.data?.records) ? dashboardRes.data.records : [];
+        setTrackingRecords(normalizeTrackingRecords(records, 3));
       } catch (e) {
         setError(e?.response?.data?.message || "Unable to load reports.");
         setLatestReport(null);
@@ -92,7 +87,7 @@ const ReportsPage = () => {
     [user, resolvedLatestReport]
   );
 
-  const resolvedTracking = trackingRecords && trackingRecords.length > 0 ? trackingRecords : demoTracking;
+  const resolvedTracking = Array.isArray(trackingRecords) ? trackingRecords : [];
 
   // Console debug to confirm click behavior + rendering.
   useEffect(() => {

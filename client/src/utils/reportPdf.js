@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { normalizeTrackingRecords } from "./tracking";
 
 const formatDateTime = (value) => {
   try {
@@ -249,14 +250,17 @@ export const generateMedicalReportPdf = ({ patient, latestReport, trackingRecord
   addParagraph("Critical phase status", criticalStatus);
 
   // Trend summary
-  if (trackingRecords?.length || history?.length) {
+  const source = normalizeTrackingRecords(trackingRecords, 3);
+  if (source.length) {
     y = ensureSpace(doc, y, 180);
     y = drawSectionHeader(doc, y, "3. 3-DAY TREND SUMMARY", left, right);
 
-    const source = (trackingRecords || []).slice(0, 3);
-
     // Hydration tracking from fluid field if present
-    const hydration = source.map((r) => Number(r.fluid ?? r.fluidIntakeLiters ?? 0));
+    const hydration = source.map((r) => {
+      const value = r.fluidIntakeLiters ?? r.fluid ?? r.hydration ?? 0;
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : 0;
+    });
 
     const toF = (c) => {
       const num = Number(c);
@@ -267,13 +271,14 @@ export const generateMedicalReportPdf = ({ patient, latestReport, trackingRecord
     const rows = source.length
       ? source.map((r, idx) => {
           const tempC = r.temperature ?? r.temp ?? r.temperatureC;
-          const risk = r.risk_score ?? r.riskScore ?? r.risk;
-          const day = r.dayOfIllness || r.day || idx + 1;
+          const risk = r.riskScore ?? r.risk_score ?? r.risk;
+          const day = r.dayOfIllness ?? r.day ?? idx + 1;
+          const hydrationValue = hydration[idx];
           return {
             day: `Day ${day}`,
             temp: tempC != null ? `${Math.round(toF(tempC) ?? 0)}°F` : "N/A",
             risk: Number.isFinite(Number(risk)) ? `${Number(risk)}` : "N/A",
-            hydration: hydration[idx] ? `${hydration[idx]} L` : "-",
+            hydration: Number.isFinite(hydrationValue) ? `${hydrationValue} L` : "-",
           };
         })
       : [];

@@ -10,6 +10,7 @@ import SymptomForm from "../components/SymptomForm";
 import TrendChart from "../components/TrendChart";
 import ChatBox from "../components/ChatBox";
 import MedicalReportDownload from "../components/MedicalReportDownload";
+import { normalizeTrackingRecords } from "../utils/tracking";
 
 const sanitizeReportText = (text) =>
   String(text || "")
@@ -106,22 +107,7 @@ const DashboardPage = () => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const maxTrackingDays = 3;
-  const demoTracking = [
-    { date: new Date(Date.now() - 2 * 86400000).toISOString(), temperature: 103, risk_score: 35 },
-    { date: new Date(Date.now() - 1 * 86400000).toISOString(), temperature: 101, risk_score: 68 },
-    { date: new Date().toISOString(), temperature: 99, risk_score: 91 },
-  ];
-  const storageKey = `dengueTracking:${user?.id || user?._id || "anonymous"}`;
   const [dashboard, setDashboard] = useState({ profile: null, records: [], trend: [] });
-  const [trackingRecords, setTrackingRecords] = useState(() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      const parsed = stored ? JSON.parse(stored) : [];
-      return Array.isArray(parsed) ? parsed.slice(-maxTrackingDays) : [];
-    } catch {
-      return [];
-    }
-  });
   const [reports, setReports] = useState([]);
   const [hospitals, setHospitals] = useState([]);
   const [error, setError] = useState("");
@@ -235,14 +221,6 @@ const DashboardPage = () => {
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(trackingRecords));
-    } catch {
-      // Ignore storage errors.
-    }
-  }, [storageKey, trackingRecords]);
-
-  useEffect(() => {
     if (!rashFile) {
       setRashPreviewUrl("");
       return undefined;
@@ -334,25 +312,12 @@ const DashboardPage = () => {
         setRagContext(String(mlResult?.rag_context || ""));
         setRagReport(String(mlResult?.report || ""));
 
-        const nextRecord = {
-          date: new Date().toISOString(),
-          temperature: Number(payload.temperature || 0),
-          risk_score: scoreValue,
-        };
-        setTrackingRecords((prev) => [...prev, nextRecord].slice(-maxTrackingDays));
       } else if (computed) {
         setRiskScore(Number(computed.riskScore || 0));
         setRiskLevel(String(computed.riskLevel || ""));
         setRiskAlerts(Array.isArray(computed.explainability?.reasons) ? computed.explainability.reasons : []);
         setRagContext("");
         setRagReport("");
-
-        const nextRecord = {
-          date: new Date().toISOString(),
-          temperature: Number(payload.temperature || 0),
-          risk_score: Number(computed.riskScore || 0),
-        };
-        setTrackingRecords((prev) => [...prev, nextRecord].slice(-maxTrackingDays));
       }
 
       if (mlErrorMessage) {
@@ -557,8 +522,8 @@ const DashboardPage = () => {
 
   const cardClass = "rounded-2xl border border-white/10 bg-[#1e293b] p-6 shadow-md";
   const sectionTitleClass = "mb-2 text-xl font-semibold text-white";
-  const trackingTitle = `${trackingRecords.length}/${maxTrackingDays} Day Tracking`;
-  const trackingSource = trackingRecords.length > 0 ? trackingRecords : demoTracking;
+  const trackingSource = normalizeTrackingRecords(dashboard.records, maxTrackingDays);
+  const trackingTitle = `${trackingSource.length}/${maxTrackingDays} Day Tracking`;
 
   const alertMessages = [
     ...riskAlerts,
@@ -671,18 +636,10 @@ const DashboardPage = () => {
           <section className={cardClass}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className={sectionTitleClass}>{trackingTitle}</h2>
-              {trackingRecords.length > 0 && (
-                <button
-                  className="rounded-lg border border-white/10 px-3 py-1 text-xs font-semibold text-gray-200 transition hover:bg-white/5"
-                  onClick={() => setTrackingRecords([])}
-                >
-                  Clear history
-                </button>
-              )}
             </div>
-            {trackingRecords.length === 0 && (
+            {trackingSource.length === 0 && (
               <p className="text-sm text-gray-400">
-                Showing a 3-day dengue progression sample (fever drops as risk increases).
+                No tracking history yet. Save a daily record to start tracking.
               </p>
             )}
             <TrendChart records={trackingSource} />
