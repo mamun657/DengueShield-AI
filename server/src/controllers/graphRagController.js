@@ -18,7 +18,7 @@ const analyze = async (req, res) => {
     const status = error.status || 500;
     return res.status(status).json({
       success: false,
-      error: error.message || "GraphRAG analysis failed",
+      error: error.message || "Clinical intelligence analysis failed",
     });
   }
 };

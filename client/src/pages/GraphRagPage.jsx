@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import api from "../api";
 import DashboardNavbar from "../components/DashboardNavbar";
 import GraphVisualization from "../components/graphrag/GraphVisualization";
 import GraphRagPanels from "../components/graphrag/GraphRagPanels";
 import { analyzeGraphRag, ALLOWED_GRAPH_SYMPTOMS, fetchGraphRagHealth } from "../api/graphRagApi";
 import { useAuth } from "../context/AuthContext";
-
-const DEMO = {
-  day: 4,
-  symptoms: ["fever_drop", "abdominal_pain", "vomiting"],
-};
+import { normalizeTrackingRecords } from "../utils/tracking";
+import { useClinicalStore } from "../store/useClinicalStore.jsx";
+import { graphResultToAssessment } from "../utils/assessment";
 
 const SYMPTOM_LABELS = {
   fever_drop: "Fever Drop",
@@ -25,22 +24,55 @@ const SYMPTOM_LABELS = {
 
 const GraphRagPage = () => {
   const { user, logout } = useAuth();
-  const [day, setDay] = useState(DEMO.day);
-  const [selected, setSelected] = useState(DEMO.symptoms);
+  const {
+    latestRecord,
+    setLatestRecord,
+    setLatestAssessment,
+    setLatestTracking,
+  } = useClinicalStore();
+  const [day, setDay] = useState(1);
+  const [selected, setSelected] = useState([]);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [health, setHealth] = useState(null);
 
-  const runAnalysis = useCallback(async (symptoms, illnessDay) => {
+  const runAnalysis = useCallback(async (symptoms, illnessDay, record) => {
     setLoading(true);
     setError("");
     try {
-      const data = await analyzeGraphRag({ symptoms, day: illnessDay });
+      const data = await analyzeGraphRag({
+        symptoms,
+        day: illnessDay,
+        temperature: record?.temperature,
+        extras: {
+          fluid: record?.fluidIntakeLiters,
+          pregnant: record?.pregnancyStatus,
+        },
+      });
       if (data.success === false) throw new Error(data.error || "Analysis failed");
+      console.log(
+        "[Clinical Intelligence] result",
+        "riskScore",
+        data?.riskScore,
+        "riskLevel",
+        data?.riskLevel,
+        "engine",
+        data?.engine
+      );
       setResult(data);
+      const mapped = graphResultToAssessment(data);
+      if (record?.computed) {
+        setLatestAssessment(record.computed);
+      } else if (mapped) {
+        setLatestAssessment(mapped);
+      }
+      console.log(
+        "[Clinical Intelligence] synced assessment riskScore",
+        record?.computed?.riskScore ?? mapped?.riskScore
+      );
     } catch (err) {
-      setError(err?.response?.data?.error || err.message || "GraphRAG analysis failed");
+      setError(err?.response?.data?.error || err.message || "Clinical intelligence analysis failed");
       setResult(null);
     } finally {
       setLoading(false);
@@ -52,8 +84,63 @@ const GraphRagPage = () => {
   }, []);
 
   useEffect(() => {
-    runAnalysis(DEMO.symptoms, DEMO.day);
-  }, [runAnalysis]);
+    let active = true;
+
+    const hydrateLatest = async () => {
+      if (latestRecord) return;
+      try {
+        const { data } = await api.get("/health/dashboard");
+        const records = Array.isArray(data?.records) ? data.records : [];
+        const record = records[records.length - 1] || null;
+        if (!active) return;
+        if (record) {
+          setLatestRecord(record);
+          setLatestAssessment(record?.computed || null);
+        }
+        setLatestTracking(normalizeTrackingRecords(records, records.length || 1));
+      } catch (err) {
+        if (!active) return;
+        setError(err?.response?.data?.message || "Unable to load latest assessment.");
+      }
+    };
+
+    hydrateLatest();
+    return () => {
+      active = false;
+    };
+  }, [latestRecord, setLatestRecord, setLatestAssessment, setLatestTracking]);
+
+  useEffect(() => {
+    if (!latestRecord) return;
+    const recordDay = Number(latestRecord.dayOfIllness || 1);
+    const mapSymptom = (symptom) => {
+      const key = String(symptom || "").toLowerCase();
+      const map = {
+        headache: "headache",
+        vomiting: "vomiting",
+        bleeding: "bleeding",
+        rash: "rash",
+        fatigue: "fatigue",
+        dehydration: "dehydration",
+        "abdominal pain": "abdominal_pain",
+        "eye pain": "eye_pain",
+        "fever drop": "fever_drop",
+        fever_drop: "fever_drop",
+      };
+      return map[key] || null;
+    };
+
+    const recordSymptoms = (latestRecord.symptoms || [])
+      .map(mapSymptom)
+      .filter((id) => id && ALLOWED_GRAPH_SYMPTOMS.includes(id));
+
+    setDay(recordDay);
+    setSelected(recordSymptoms);
+
+    if (recordSymptoms.length > 0) {
+      runAnalysis(recordSymptoms, recordDay);
+    }
+  }, [latestRecord, runAnalysis]);
 
   const toggleSymptom = (id) => {
     setSelected((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
@@ -67,10 +154,25 @@ const GraphRagPage = () => {
     runAnalysis(selected, day);
   };
 
-  const loadDemo = () => {
-    setDay(DEMO.day);
-    setSelected(DEMO.symptoms);
-    runAnalysis(DEMO.symptoms, DEMO.day);
+  const loadLatest = () => {
+    if (!latestRecord) return;
+    const recordDay = Number(latestRecord.dayOfIllness || 1);
+    const recordSymptoms = (latestRecord.symptoms || [])
+      .map((symptom) => String(symptom || "").toLowerCase())
+      .map((symptom) =>
+        symptom === "abdominal pain"
+          ? "abdominal_pain"
+          : symptom === "eye pain"
+            ? "eye_pain"
+            : symptom
+      )
+      .filter((id) => ALLOWED_GRAPH_SYMPTOMS.includes(id));
+
+    setDay(recordDay);
+    setSelected(recordSymptoms);
+    if (recordSymptoms.length > 0) {
+      runAnalysis(recordSymptoms, recordDay, latestRecord);
+    }
   };
 
   return (
@@ -81,14 +183,14 @@ const GraphRagPage = () => {
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300/90">
-              GraphRAG Clinical Intelligence
+              AI Clinical Intelligence Engine
             </p>
             <h1 className="mt-1 text-2xl font-bold text-white md:text-3xl">
-              WHO-Aligned Dengue Knowledge Graph
+              WHO-Aligned Clinical Intelligence Engine
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              Relationship-aware medical reasoning — not just document retrieval. Machine-readable WHO
-              pathways make symptom progression explainable for clinicians and public-health teams.
+              Relationship-aware clinical intelligence — not just document retrieval. WHO-aligned pathways
+              make symptom progression explainable for care teams and public-health leadership.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -100,10 +202,10 @@ const GraphRagPage = () => {
             </Link>
             <button
               type="button"
-              onClick={loadDemo}
+              onClick={loadLatest}
               className="rounded-lg border border-cyan-300/40 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-500/20"
             >
-              Live Demo (Day 4)
+              Live Analysis (Day {latestRecord?.dayOfIllness || day})
             </button>
           </div>
         </div>
@@ -122,10 +224,10 @@ const GraphRagPage = () => {
         )}
 
         <div className="mb-6 rounded-xl border border-cyan-300/15 bg-gradient-to-r from-cyan-500/5 via-transparent to-teal-500/5 p-4 text-xs leading-relaxed text-slate-400">
-          <strong className="text-cyan-200">Why GraphRAG beats traditional RAG:</strong> classic RAG returns
-          similar text chunks only. GraphRAG traverses <em>INDICATES → CLASSIFIED_AS → REQUIRES</em> edges so
-          fever drop on day 4 can be linked to critical phase, WHO warnings, and hospitalization — with a full
-          audit trail for judges and investors.
+          <strong className="text-cyan-200">Why Clinical Intelligence beats traditional RAG:</strong> classic
+          RAG returns similar text chunks only. The clinical intelligence engine traverses WHO-aligned
+          pathways so fever drop may link to possible critical phase transition, WHO warnings, and escalation guidance — with
+          a clear audit trail for clinicians and stakeholders.
         </div>
 
         <div className="grid gap-6 lg:grid-cols-12">
@@ -165,7 +267,7 @@ const GraphRagPage = () => {
                 disabled={loading}
                 className="mt-4 w-full rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 py-2.5 text-sm font-semibold text-[#062036] transition hover:brightness-110 disabled:opacity-60"
               >
-                {loading ? "Running hybrid pipeline…" : "Run GraphRAG Analysis"}
+                {loading ? "Running hybrid pipeline…" : "Run Clinical Intelligence Analysis"}
               </button>
               {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
             </div>
@@ -182,7 +284,9 @@ const GraphRagPage = () => {
 
           <div className="lg:col-span-8">
             <div className="rounded-2xl border border-cyan-300/20 bg-[#0b1220] p-4">
-              <p className="mb-3 text-xs uppercase tracking-wider text-cyan-200/80">Live Knowledge Graph</p>
+              <p className="mb-3 text-xs uppercase tracking-wider text-cyan-200/80">
+                Live Clinical Intelligence Map
+              </p>
               <div className="flex justify-center">
                 <GraphVisualization
                   graphData={result?.graph}

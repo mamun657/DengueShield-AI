@@ -39,7 +39,7 @@ const GraphVisualization = ({ graphData, width = 520, height = 360, highlightIds
         className="flex items-center justify-center rounded-xl border border-dashed border-cyan-300/20 bg-black/30 text-sm text-slate-500"
         style={{ width, height }}
       >
-        Run analysis to visualize pathways
+        Run analysis to visualize clinical pathways
       </div>
     );
   }

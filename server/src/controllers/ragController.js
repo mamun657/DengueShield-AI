@@ -23,10 +23,10 @@ const buildLocalChatReply = (message) => {
   }
 
   if (/(fever|rash|bleeding|vomit|vomiting|headache|dengue|pain|weakness|nausea)/.test(text)) {
-    return "If you have high fever, severe headache, rash, bleeding, or persistent vomiting, seek medical care promptly. Stay hydrated and rest.";
+    return "Your symptoms may indicate elevated dengue risk based on WHO warning patterns. I cannot confirm a diagnosis without clinical and laboratory evaluation. Please seek medical care if you have high fever, rash, bleeding, or persistent vomiting. Stay hydrated and rest.";
   }
 
-  return "Please describe your symptoms, like fever, rash, headache, bleeding, or vomiting.";
+  return "Please describe your symptoms (fever, rash, headache, bleeding, vomiting). I provide probabilistic risk guidance, not a definitive diagnosis.";
 };
 
 // @desc    Ask a medical question to the AI using RAG

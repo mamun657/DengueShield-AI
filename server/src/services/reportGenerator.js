@@ -1,11 +1,12 @@
-const generateDoctorReport = ({ userName, record }) => {
+const generateDoctorReport = ({ userName, record, assessment }) => {
   const warningSigns = record.symptoms.filter((s) =>
     ["vomiting", "abdominal pain", "bleeding", "restlessness"].includes(s)
   );
 
   const warningText = warningSigns.length ? warningSigns.join(", ") : "None reported.";
-  const scoreText = `${record.computed.riskScore}/100`;
-  const levelText = record.computed.riskLevel;
+  const resolved = assessment || record.computed || {};
+  const scoreText = `${resolved.riskScore ?? 0}/100`;
+  const levelText = resolved.riskLevel || "Low";
 
   return [
     `Assessment Summary: ${userName} is on day ${record.dayOfIllness} with temperature ${record.temperature}C.`,

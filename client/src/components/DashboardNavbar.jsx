@@ -77,7 +77,7 @@ const DashboardNavbar = ({ userName, userRole, onLogout, onOpenSmartDoctor }) =>
             }`
           }
         >
-          ◈ GraphRAG
+          ◈ Clinical Intelligence
         </NavLink>
 
         <NavLink 

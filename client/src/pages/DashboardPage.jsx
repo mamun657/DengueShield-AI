@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
 import api from "../api";
-import { predictRisk } from "../mlApi";
 import { useAuth } from "../context/AuthContext";
 import DashboardNavbar from "../components/DashboardNavbar";
 import RiskSummary from "../components/RiskSummary";
@@ -11,6 +10,13 @@ import TrendChart from "../components/TrendChart";
 import ChatBox from "../components/ChatBox";
 import MedicalReportDownload from "../components/MedicalReportDownload";
 import { normalizeTrackingRecords } from "../utils/tracking";
+import { useClinicalStore } from "../store/useClinicalStore.jsx";
+import { resolveUnifiedAssessment, logPreviousReportRender } from "../utils/assessment";
+import {
+  formatClinicalRisk,
+  shouldShowElevatedCare,
+  shouldShowLabCritical,
+} from "../utils/clinicalRisk";
 
 const sanitizeReportText = (text) =>
   String(text || "")
@@ -47,14 +53,19 @@ const extractReportSections = (report) => {
   const lines = cleanText.split("\n").map((line) => line.trim()).filter(Boolean);
   const sections = {
     "Assessment Summary": report?.summary || "Clinical assessment summary unavailable.",
-    "Detected Warning Signs": (report?.symptoms || []).join(", ") || "None reported.",
+    "Detected Warning Signs":
+      (report?.detectedWarnings || report?.symptoms || []).join(", ") || "None reported.",
     "AI Risk Score": Number.isFinite(report?.riskScore)
       ? `${report.riskScore}/100 (${report.riskLevel})`
       : "Not available",
     "Recommended Action": "Continue hydration, monitor temperature, and recheck symptoms every 12-24 hours.",
-    "WHO Guidance": "Maintain hydration, monitor platelet count, and seek immediate clinical care if bleeding or abdominal pain develops.",
+    "WHO Guidance":
+      report?.whoGuidance ||
+      "Maintain hydration, monitor platelet count, and seek immediate clinical care if bleeding or abdominal pain develops.",
     "WHO Guidance (Bangla)": "WHO নির্দেশনা: পর্যাপ্ত পানি পান করুন এবং রক্তক্ষরণ বা পেটব্যথা দেখা দিলে দ্রুত হাসপাতালে যোগাযোগ করুন।",
-    "Emergency Advice": "Seek urgent care for persistent vomiting, bleeding, severe abdominal pain, or drowsiness.",
+    "Emergency Advice":
+      report?.emergencyAdvice ||
+      "Seek urgent care for persistent vomiting, bleeding, severe abdominal pain, or drowsiness.",
     "Disclaimer": "This AI-generated report is informational and does not replace a licensed physician.",
   };
 
@@ -77,7 +88,7 @@ const extractReportSections = (report) => {
     "Disclaimer",
   ].map((title) => ({ title, content: formatTemperatureText(sections[title]) }));
 
-  if (report?.riskScore > 85) {
+  if (report?.riskScore >= 61) {
     ordered.push({
       title: "Emergency Advice (Bangla)",
       content: "রোগীর অবস্থা বর্তমানে ঝুঁকিপূর্ণ। তাৎক্ষণিক হাসপাতালে যোগাযোগ করুন।",
@@ -87,18 +98,193 @@ const extractReportSections = (report) => {
   return ordered;
 };
 
-const ReportSections = ({ report, density = "full" }) => {
+const reportSectionMeta = {
+  "Assessment Summary": {
+    icon: "doc",
+    tone: "border-sky-500/30 bg-sky-500/10 text-sky-300",
+  },
+  "Detected Warning Signs": {
+    icon: "alert",
+    tone: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+  },
+  "AI Risk Score": {
+    icon: "shield",
+    tone: "border-violet-500/30 bg-violet-500/10 text-violet-300",
+  },
+  "Recommended Action": {
+    icon: "pulse",
+    tone: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+  },
+  "WHO Guidance": {
+    icon: "book",
+    tone: "border-cyan-500/30 bg-cyan-500/10 text-cyan-300",
+  },
+  "WHO Guidance (Bangla)": {
+    icon: "globe",
+    tone: "border-sky-500/30 bg-sky-500/10 text-sky-300",
+  },
+  "Emergency Advice": {
+    icon: "alert",
+    tone: "border-red-500/30 bg-red-500/10 text-red-300",
+  },
+  "Emergency Advice (Bangla)": {
+    icon: "alert",
+    tone: "border-red-500/30 bg-red-500/10 text-red-300",
+  },
+  Disclaimer: {
+    icon: "info",
+    tone: "border-slate-500/30 bg-slate-500/10 text-slate-300",
+  },
+};
+
+const renderReportIcon = (iconKey, className) => {
+  switch (iconKey) {
+    case "alert":
+      return (
+        <svg
+          className={className}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M12 9v4" />
+          <path d="M12 17h.01" />
+          <path d="M10.3 3.8 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z" />
+        </svg>
+      );
+    case "shield":
+      return (
+        <svg
+          className={className}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M12 3 19 6v6c0 5-3.5 8-7 9-3.5-1-7-4-7-9V6l7-3Z" />
+          <path d="M9.5 12h5" />
+        </svg>
+      );
+    case "pulse":
+      return (
+        <svg
+          className={className}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M3 12h4l2-4 4 8 2-4h4" />
+        </svg>
+      );
+    case "book":
+      return (
+        <svg
+          className={className}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M3 6h7a3 3 0 0 1 3 3v12a3 3 0 0 0-3-3H3Z" />
+          <path d="M21 6h-7a3 3 0 0 0-3 3v12a3 3 0 0 1 3-3h7Z" />
+        </svg>
+      );
+    case "globe":
+      return (
+        <svg
+          className={className}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18" />
+          <path d="M12 3a12 12 0 0 0 0 18" />
+          <path d="M12 3a12 12 0 0 1 0 18" />
+        </svg>
+      );
+    case "info":
+      return (
+        <svg
+          className={className}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 10v6" />
+          <path d="M12 7h.01" />
+        </svg>
+      );
+    case "doc":
+    default:
+      return (
+        <svg
+          className={className}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M9 4h6l3 3v13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+          <path d="M15 4v4h4" />
+          <path d="M9 13h6" />
+          <path d="M9 17h4" />
+        </svg>
+      );
+  }
+};
+
+const ReportSections = ({ report, density = "full", className = "" }) => {
   const sections = extractReportSections(report);
   const displaySections = density === "compact" ? sections.slice(0, 3) : sections;
+  const isCompact = density === "compact";
+  const iconSize = isCompact ? "h-7 w-7" : "h-8 w-8";
+  const iconGlyph = isCompact ? "h-3.5 w-3.5" : "h-4 w-4";
+  const titleClass = isCompact ? "text-[10px]" : "text-[11px]";
+  const bodyClass = isCompact ? "text-xs" : "text-sm";
+  const rowPadding = isCompact ? "py-2" : "py-3";
 
   return (
-    <div className="space-y-3">
-      {displaySections.map((section) => (
-        <div key={section.title} className="rounded-lg border border-white/10 bg-black/20 p-3">
-          <p className="text-xs uppercase tracking-wider text-slate-400">{section.title}</p>
-          <p className="mt-1 text-sm text-slate-200">{section.content}</p>
-        </div>
-      ))}
+    <div className={`divide-y divide-white/10 ${className}`}>
+      {displaySections.map((section) => {
+        const meta = reportSectionMeta[section.title] || reportSectionMeta["Assessment Summary"];
+        return (
+          <div key={section.title} className={`flex gap-3 ${rowPadding}`}>
+            <div
+              className={`mt-0.5 flex ${iconSize} items-center justify-center rounded-lg border ${meta.tone}`}
+            >
+              {renderReportIcon(meta.icon, iconGlyph)}
+            </div>
+            <div className="min-w-0">
+              <p className={`${titleClass} uppercase tracking-[0.2em] text-slate-400`}>
+                {section.title}
+              </p>
+              <p className={`mt-1 ${bodyClass} leading-relaxed text-slate-200`}>
+                {section.content}
+              </p>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -106,17 +292,22 @@ const ReportSections = ({ report, density = "full" }) => {
 const DashboardPage = () => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
-  const maxTrackingDays = 3;
+  const {
+    latestAssessment,
+    currentRisk,
+    latestTracking,
+    setLatestAssessment,
+    setCurrentRisk,
+    setLatestTracking,
+    setLatestRecord,
+    setLatestReport,
+    hydrateFromDashboard,
+  } = useClinicalStore();
   const [dashboard, setDashboard] = useState({ profile: null, records: [], trend: [] });
   const [reports, setReports] = useState([]);
   const [hospitals, setHospitals] = useState([]);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [riskScore, setRiskScore] = useState(null);
-  const [riskLevel, setRiskLevel] = useState("");
-  const [riskAlerts, setRiskAlerts] = useState([]);
-  const [ragContext, setRagContext] = useState("");
-  const [ragReport, setRagReport] = useState("");
   const [predictionError, setPredictionError] = useState("");
   const [predictionNotice, setPredictionNotice] = useState("");
   const [predictionLoading, setPredictionLoading] = useState(false);
@@ -139,20 +330,16 @@ const DashboardPage = () => {
   const [cameraLoading, setCameraLoading] = useState(false);
 
 
-  const normalizeRiskLevel = (level) => {
-    const value = String(level || "").toUpperCase();
-    if (value === "CRITICAL") return "Critical";
-    if (value === "MODERATE" || value === "MEDIUM") return "Medium";
-    if (value === "HIGH") return "High";
-    return value ? "Low" : "";
-  };
+  const resolvedAssessment = resolveUnifiedAssessment({
+    latestAssessment,
+    currentRisk,
+    latestRecord: dashboard.records[dashboard.records.length - 1],
+  });
 
-  const riskLevelLabel = normalizeRiskLevel(riskLevel);
-  const fallbackRiskLevel = normalizeRiskLevel(dashboard.records[dashboard.records.length - 1]?.computed?.riskLevel);
-  const displayRiskLevel = riskLevelLabel || fallbackRiskLevel;
-  const translateRiskLevel = (level) => t(`riskLevel${level}`, { defaultValue: level });
-  const translatedRiskLevel = displayRiskLevel ? translateRiskLevel(displayRiskLevel) : "";
-  const displayRiskScore = riskScore ?? dashboard.records[dashboard.records.length - 1]?.computed?.riskScore ?? null;
+  const clinicalDisplay = formatClinicalRisk(resolvedAssessment);
+  const translatedRiskLevel =
+    resolvedAssessment?.severityLabel || resolvedAssessment?.riskLevel || "";
+  const displayRiskScore = resolvedAssessment?.riskScore ?? null;
 
   const rashMaxSizeMb = 5;
   const rashApiBase = import.meta.env.VITE_ML_API_URL || "http://127.0.0.1:5001";
@@ -199,6 +386,40 @@ const DashboardPage = () => {
     return "📄";
   };
 
+  const getRiskTheme = (level) => {
+    const l = String(level || "").toUpperCase();
+    if (l === "CRITICAL") {
+      return {
+        badge: "border-red-400/60 bg-red-500/20 text-red-200",
+        glow: "shadow-[0_0_45px_rgba(248,113,113,0.25)]",
+        hoverGlow: "hover:shadow-[0_0_60px_rgba(248,113,113,0.35)]",
+        accent: "from-red-500/80 via-red-500/30 to-transparent",
+      };
+    }
+    if (l === "HIGH") {
+      return {
+        badge: "border-orange-400/50 bg-orange-500/20 text-orange-200",
+        glow: "shadow-[0_0_40px_rgba(251,146,60,0.22)]",
+        hoverGlow: "hover:shadow-[0_0_55px_rgba(251,146,60,0.3)]",
+        accent: "from-orange-500/70 via-orange-500/30 to-transparent",
+      };
+    }
+    if (l === "MODERATE" || l === "MEDIUM") {
+      return {
+        badge: "border-amber-400/50 bg-amber-500/15 text-amber-200",
+        glow: "shadow-[0_0_35px_rgba(251,191,36,0.2)]",
+        hoverGlow: "hover:shadow-[0_0_50px_rgba(251,191,36,0.28)]",
+        accent: "from-amber-400/70 via-amber-400/25 to-transparent",
+      };
+    }
+    return {
+      badge: "border-emerald-400/40 bg-emerald-500/15 text-emerald-200",
+      glow: "shadow-[0_0_30px_rgba(52,211,153,0.2)]",
+      hoverGlow: "hover:shadow-[0_0_45px_rgba(52,211,153,0.28)]",
+      accent: "from-emerald-400/60 via-emerald-400/20 to-transparent",
+    };
+  };
+
   const load = async () => {
     try {
       setError("");
@@ -207,8 +428,31 @@ const DashboardPage = () => {
         api.get("/health/dashboard"),
         api.get("/reports"),
       ]);
-      setDashboard(dashRes.data);
-      setReports(reportRes.data);
+      const dashboardData = dashRes.data;
+      const reportData = reportRes.data;
+      setDashboard(dashboardData);
+      setReports(reportData);
+
+      const recordCount = dashboardData?.records?.length || 0;
+      const tracking = normalizeTrackingRecords(dashboardData?.records || [], recordCount || 1);
+      hydrateFromDashboard({ dashboard: dashboardData, reports: reportData, tracking });
+      setLatestTracking(tracking);
+      if (dashboardData?.latestAssessment) {
+        setLatestAssessment(dashboardData.latestAssessment);
+        setCurrentRisk(dashboardData.latestAssessment);
+      }
+
+      const latestRecord = (dashboardData?.records || []).slice(-1)[0];
+      if (latestRecord) {
+        console.log(
+          "[Dashboard] latestRecord",
+          latestRecord._id,
+          "riskScore",
+          latestRecord?.computed?.riskScore,
+          "source",
+          latestRecord?.computed?.riskSource
+        );
+      }
     } catch (err) {
       setError(err?.response?.data?.message || "Unable to load dashboard data.");
     } finally {
@@ -241,93 +485,45 @@ const DashboardPage = () => {
   const latestComputed = latest?.computed;
   const previous = dashboard.records[dashboard.records.length - 2];
   const criticalPhaseDetected = detectCriticalPhase(latest, previous);
-  const isEmergency = displayRiskScore != null && displayRiskScore > 85;
-
-  const buildPredictionPayload = (form) => {
-    const symptoms = form.symptoms || [];
-    const temp = Number(form.temperature || 0);
-    const day = Number(form.dayOfIllness || 0);
-    const has = (name) => (symptoms.includes(name) ? 1 : 0);
-
-    const warningSign = has("bleeding") || has("abdominal pain") || has("vomiting");
-    const daysHighFever = temp >= 38.5 ? day : 0;
-
-    const patientId = Number(user?.id || user?._id || 0) || 1;
-
-    return {
-      patient_id: patientId,
-      day,
-      temp,
-      prev_temp: temp,
-      fever_change: 0,
-      headache: has("headache"),
-      vomiting: has("vomiting"),
-      abdominal_pain: has("abdominal pain"),
-      bleeding: has("bleeding"),
-      fatigue: has("fatigue"),
-      rash: has("rash"),
-      eye_pain: has("eye pain"),
-      appetite_loss: has("appetite loss"),
-      restlessness: has("restlessness"),
-      fluid: Number(form.fluidIntakeLiters || 0),
-      pregnant: form.pregnancyStatus ? 1 : 0,
-      days_high_fever: Number(daysHighFever),
-      warning_sign: warningSign ? 1 : 0,
-    };
-  };
+  const isLabCritical = shouldShowLabCritical(resolvedAssessment);
+  const isElevatedConcern = shouldShowElevatedCare(resolvedAssessment) && !isLabCritical;
 
   const handleSymptomSubmit = async (payload) => {
     setPredictionError("");
     setPredictionNotice("");
     setPredictionLoading(true);
 
-    let mlResult = null;
-    let mlErrorMessage = "";
-
-    try {
-      const predictionPayload = buildPredictionPayload(payload);
-      console.log("[ML] Prepared payload:", predictionPayload);
-      mlResult = await predictRisk(predictionPayload);
-      console.log("[ML] Result:", mlResult);
-    } catch (err) {
-      mlErrorMessage = err?.response?.data?.error || err?.response?.data?.message || err?.message || "Prediction failed.";
-    }
-
     try {
       const { data: record } = await api.post("/health/records", payload);
       const computed = record?.computed;
 
-      if (mlResult) {
-        const scoreValue = Number(mlResult?.risk_score);
-        if (!Number.isFinite(scoreValue)) {
-          throw new Error("Invalid risk score from ML API");
-        }
-        const levelValue = String(mlResult?.risk_level || "").toUpperCase();
-        if (!levelValue) {
-          throw new Error("Invalid risk level from ML API");
-        }
-        setRiskScore(scoreValue);
-        setRiskLevel(levelValue);
-        setRiskAlerts(Array.isArray(mlResult?.alerts) ? mlResult.alerts : []);
-        setRagContext(String(mlResult?.rag_context || ""));
-        setRagReport(String(mlResult?.report || ""));
-
-      } else if (computed) {
-        setRiskScore(Number(computed.riskScore || 0));
-        setRiskLevel(String(computed.riskLevel || ""));
-        setRiskAlerts(Array.isArray(computed.explainability?.reasons) ? computed.explainability.reasons : []);
-        setRagContext("");
-        setRagReport("");
+      if (computed) {
+        setLatestAssessment(computed);
+        setCurrentRisk(computed);
       }
 
-      if (mlErrorMessage) {
+      setLatestRecord(record);
+
+      if (computed?.riskSource === "fallback") {
         setPredictionNotice("ML service unavailable. Saved record with baseline risk.");
       }
+
+      console.log(
+        "[Dashboard] savedRecord",
+        record?._id,
+        "riskScore",
+        computed?.riskScore,
+        "source",
+        computed?.riskSource
+      );
 
       await load();
 
       try {
-        await api.post("/reports", { nearestHospitals: hospitals });
+        const reportResponse = await api.post("/reports", { nearestHospitals: hospitals });
+        if (reportResponse?.data) {
+          setLatestReport(reportResponse.data);
+        }
         await load();
       } catch (reportError) {
         console.error("Failed to auto-generate report", reportError);
@@ -522,19 +718,32 @@ const DashboardPage = () => {
 
   const cardClass = "rounded-2xl border border-white/10 bg-[#1e293b] p-6 shadow-md";
   const sectionTitleClass = "mb-2 text-xl font-semibold text-white";
-  const trackingSource = normalizeTrackingRecords(dashboard.records, maxTrackingDays);
-  const trackingTitle = `${trackingSource.length}/${maxTrackingDays} Day Tracking`;
+  const trackingSource =
+    latestTracking.length > 0
+      ? latestTracking
+      : normalizeTrackingRecords(dashboard.records, dashboard.records?.length || 0);
+  const trackingTitle = `${trackingSource.length} Day${trackingSource.length === 1 ? "" : "s"} Tracking`;
 
+  const assessmentAlerts = Array.isArray(resolvedAssessment?.detectedWarnings) &&
+    resolvedAssessment.detectedWarnings.length > 0
+    ? resolvedAssessment.detectedWarnings
+    : resolvedAssessment?.explainability?.reasons || [];
+
+  const severityLabel = resolvedAssessment?.severityLabel || translatedRiskLevel;
   const alertMessages = [
-    ...riskAlerts,
-    displayRiskLevel === "Critical" ? t("criticalAlert") : null,
-    displayRiskLevel === "High" ? t("riskMessageHigh") : null,
-    displayRiskLevel === "Medium" ? t("riskMessageMedium") : null,
-    displayRiskLevel === "Low" ? t("riskMessageLow") : null,
+    ...assessmentAlerts,
+    ...(resolvedAssessment?.recommendations || []),
+    severityLabel === "Severe Dengue Risk" || severityLabel === "Critical"
+      ? "Urgent clinical evaluation recommended (lab-enhanced assessment)"
+      : null,
+    severityLabel === "High Risk Suspicion"
+      ? "Elevated dengue risk suspicion — clinical confirmation recommended"
+      : null,
     latest?.temperature >= 38.5 ? t("alertHighFever") : null,
     (latest?.symptoms || []).includes("bleeding") ? t("alertBleeding") : null,
     latest?.dayOfIllness >= 3 && latest?.dayOfIllness <= 7 ? t("alertPlateletRisk") : null,
-    criticalPhaseDetected ? "⚠️ Possible Critical Phase Detected" : null,
+    criticalPhaseDetected ? "Possible transition toward dengue critical phase detected" : null,
+    resolvedAssessment?.labPending ? "CBC / Platelet test advised" : null,
   ].filter(Boolean);
   const uniqueAlerts = Array.from(new Set(alertMessages));
 
@@ -585,22 +794,18 @@ const DashboardPage = () => {
         </div>
 
         <div className="mt-6 space-y-4">
-          {isEmergency && (
+          {isLabCritical && (
             <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-5 text-red-200 shadow-[0_0_30px_rgba(239,68,68,0.35)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-red-300">Emergency Mode</p>
-                  <h2 className="mt-2 text-xl font-semibold text-white">🚨 SEEK IMMEDIATE MEDICAL CARE</h2>
+                  <p className="text-xs uppercase tracking-[0.3em] text-red-300">Laboratory-Enhanced Alert</p>
+                  <h2 className="mt-2 text-xl font-semibold text-white">Urgent clinical evaluation recommended</h2>
                   <p className="mt-2 text-sm text-red-200">
-                    Risk score indicates a critical phase. Proceed to the nearest hospital now.
-                  </p>
-                  <p className="mt-2 text-xs text-red-200">
-                    Emergency hydration: Oral rehydration solution, small sips every 5-10 minutes while awaiting care.
+                    Laboratory indicators suggest severe dengue risk. Proceed to clinical care promptly.
                   </p>
                 </div>
-                <div className="flex items-center gap-2 text-2xl">
-                  <span className="animate-pulse">🚨</span>
-                  <span className="text-3xl font-semibold text-white">{Math.round(displayRiskScore)}</span>
+                <div className="text-3xl font-semibold text-white tabular-nums">
+                  {clinicalDisplay?.scoreLine || `${Math.round(displayRiskScore)}/100`}
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -618,9 +823,23 @@ const DashboardPage = () => {
               </div>
             </div>
           )}
+          {isElevatedConcern && (
+            <div className="rounded-2xl border border-amber-500/35 bg-amber-500/10 p-5 text-amber-100">
+              <p className="text-xs uppercase tracking-[0.2em] text-amber-200">Elevated clinical suspicion</p>
+              <h2 className="mt-2 text-lg font-semibold text-white">
+                {clinicalDisplay?.displayTitle || "High Risk Suspicion"}
+              </h2>
+              <p className="mt-2 text-sm text-amber-100">
+                Your symptoms may indicate elevated dengue risk based on WHO warning patterns. Clinical confirmation and
+                CBC/platelet testing are recommended.
+              </p>
+              <p className="mt-2 text-2xl font-bold text-white tabular-nums">{clinicalDisplay?.scoreLine}</p>
+            </div>
+          )}
           <RiskSummary
+            assessment={resolvedAssessment}
             riskScore={displayRiskScore}
-            riskLevel={displayRiskLevel}
+            riskLevel={translatedRiskLevel}
             translatedRiskLevel={translatedRiskLevel}
             alerts={uniqueAlerts}
           />
@@ -658,14 +877,13 @@ const DashboardPage = () => {
               {predictionNotice && !predictionError && (
                 <p className="text-sm text-gray-300">{predictionNotice}</p>
               )}
-              {riskScore != null && !predictionLoading && !predictionError && (
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-gray-200">
+              {clinicalDisplay && !predictionLoading && !predictionError && (
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-gray-200 space-y-1">
                   <p>
-                    Risk score: <span className="font-semibold text-white">{riskScore.toFixed(2)}</span>
+                    Estimated risk: <span className="font-semibold text-white">{clinicalDisplay.scoreLine}</span>
                   </p>
-                  <p>
-                    Risk level: <span className="font-semibold text-white">{translatedRiskLevel}</span>
-                  </p>
+                  <p className="text-xs text-slate-400">{clinicalDisplay.clinicalSubtitle}</p>
+                  <p className="text-xs text-cyan-300/90">AI Confidence: {clinicalDisplay.aiConfidenceLabel}</p>
                 </div>
               )}
             </div>
@@ -690,73 +908,113 @@ const DashboardPage = () => {
               )}
 
               {/* Latest Report (Big Card) */}
-              {reports.length > 0 && (
-                <div className="bg-white/5 border border-white/10 rounded-xl p-5 space-y-3 shadow-lg relative overflow-hidden group">
-                  <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{getRiskIcon(reports[0].riskLevel)}</span>
-                      <h3 className="font-bold text-white">Latest Assessment</h3>
-                    </div>
-                    <span className="text-xs text-gray-400 bg-black/20 px-2 py-1 rounded border border-white/5">
-                      {new Date(reports[0].createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center gap-4 text-sm bg-black/20 w-fit px-3 py-1.5 rounded-lg border border-white/5">
-                    <p className="text-gray-300">
-                      Risk: <span className={`font-bold ${getRiskColor(reports[0].riskLevel)}`}>{reports[0].riskLevel}</span>
-                    </p>
-                    {reports[0].riskScore > 0 && (
-                      <p className="text-gray-300 border-l border-white/10 pl-4">Score: <span className="font-bold text-white">{reports[0].riskScore}/100</span></p>
-                    )}
-                  </div>
+              {reports.length > 0 && (() => {
+                const latestReport = reports[0];
+                const latestTheme = getRiskTheme(latestReport?.riskLevel);
+                console.log(
+                  "[LATEST REPORT RENDER]",
+                  "rendering report:",
+                  latestReport._id,
+                  "riskScore:",
+                  latestReport.riskScore,
+                  "createdAt:",
+                  latestReport.createdAt
+                );
 
-                  <ReportSections report={reports[0]} />
-                  
-                  <div className="flex gap-2 pt-2">
-                    <MedicalReportDownload
-                      report={reports[0]}
-                      patient={{
-                        name: user?.name,
-                        email: user?.email || user?.id || user?._id,
-                        pregnancyStatus: latest?.pregnancyStatus,
-                        dayOfIllness: latest?.dayOfIllness,
-                        updatedAt: latest?.updatedAt,
-                      }}
-                      trackingRecords={trackingSource}
-                      history={dashboard.records}
-                      hospitals={hospitals}
+                return (
+                  <div
+                    className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-slate-950/80 via-slate-900/70 to-slate-950/90 p-5 backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 ${latestTheme.glow} ${latestTheme.hoverGlow}`}
+                  >
+                    <div
+                      className={`pointer-events-none absolute left-0 top-0 h-full w-[2px] bg-gradient-to-b ${latestTheme.accent}`}
                     />
-                    <button onClick={() => deleteReport(reports[0]._id)} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded transition">
-                      🗑️ Delete
-                    </button>
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.08),_transparent_55%)]" />
+                    <div className="relative z-10">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5">
+                            <span className="text-lg">{getRiskIcon(latestReport.riskLevel)}</span>
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-white">Latest Assessment</h3>
+                            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                              Clinical AI report
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-slate-300">
+                            {new Date(latestReport.createdAt).toLocaleDateString()}
+                          </span>
+                          <span
+                            className={`rounded-full border px-3 py-1 font-semibold uppercase tracking-wider ${latestTheme.badge}`}
+                          >
+                            {latestReport.riskLevel}
+                          </span>
+                          {latestReport.riskScore > 0 && (
+                            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-200">
+                              Score: <span className="font-semibold text-white">{latestReport.riskScore}/100</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <ReportSections report={latestReport} className="mt-4" />
+
+                      <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-3">
+                        <MedicalReportDownload
+                          report={latestReport}
+                          patient={{
+                            name: user?.name,
+                            email: user?.email || user?.id || user?._id,
+                            pregnancyStatus: latest?.pregnancyStatus,
+                            dayOfIllness: latest?.dayOfIllness,
+                            updatedAt: latest?.updatedAt,
+                          }}
+                          trackingRecords={trackingSource}
+                          history={dashboard.records}
+                          hospitals={hospitals}
+                        />
+                        <button
+                          onClick={() => deleteReport(latestReport._id)}
+                          className="text-xs text-red-300 transition hover:text-red-200"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Previous Reports (Smaller Cards) */}
               {reports.length > 1 && (
                 <div className="space-y-3 mt-6">
                   <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Previous Reports</h4>
-                  {reports.slice(1, 4).map((report) => (
+                  {reports.slice(1, 4).map((report) => {
+                    logPreviousReportRender(report);
+                    return (
                     <div key={report._id} className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-2 hover:bg-white/10 transition group">
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <span>{getRiskIcon(report.riskLevel)}</span>
                           <p className="text-sm text-gray-300">
                             <span className={`font-semibold ${getRiskColor(report.riskLevel)}`}>{report.riskLevel}</span> Risk
+                            {Number.isFinite(report.riskScore) && (
+                              <span className="ml-2 text-slate-400">({Math.round(report.riskScore)}/100)</span>
+                            )}
                           </p>
                         </div>
                         <span className="text-xs text-gray-500">{new Date(report.createdAt).toLocaleDateString()}</span>
                       </div>
-                      <ReportSections report={report} density="compact" />
+                      <ReportSections report={report} density="compact" className="mt-2" />
                       <div className="flex justify-between items-center pt-1">
                         <button onClick={() => alert("Sharing...")} className="text-xs text-blue-400 hover:text-blue-300 transition">Share</button>
                         <button onClick={() => deleteReport(report._id)} className="text-xs text-red-400 hover:text-red-300 transition opacity-0 group-hover:opacity-100">Delete</button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1059,7 +1317,9 @@ const DashboardPage = () => {
               {fullHistory.length === 0 ? (
                 <p className="text-center text-gray-400 py-10">No history available.</p>
               ) : (
-                fullHistory.map((report) => (
+                fullHistory.map((report) => {
+                  logPreviousReportRender(report);
+                  return (
                   <div key={report._id} className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
@@ -1078,9 +1338,10 @@ const DashboardPage = () => {
                         Delete
                       </button>
                     </div>
-                    <ReportSections report={report} />
+                    <ReportSections report={report} className="mt-3" />
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

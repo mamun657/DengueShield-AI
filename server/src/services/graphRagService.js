@@ -10,6 +10,7 @@ const { runQuery, verifyConnectivity, isConnected } = require("../config/neo4j")
 const graph = require("../graph/knowledgeGraphData");
 const { normalizeSymptoms, toMlPayload } = require("../utils/symptomNormalizer");
 const cache = require("../utils/graphCache");
+const { calculateClinicalRisk } = require("./riskEngine");
 
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.1-8b-instant";
 
@@ -200,9 +201,12 @@ const detectCriticalPhase = (symptomIds, day, paths = []) => {
 
   return {
     detected: (hasFeverDrop && criticalDay) || graphCritical,
+    label: "Possible transition toward dengue critical phase detected.",
     reasons: [
-      hasFeverDrop && criticalDay ? "Fever drop during day 3–7 critical window" : null,
-      graphCritical ? "Graph pathway matched dengue critical phase node" : null,
+      hasFeverDrop && criticalDay
+        ? "Fever drop during day 3–7 — possible critical phase transition"
+        : null,
+      graphCritical ? "Clinical intelligence pathway suggests critical phase pattern" : null,
       warningSigns.length ? `WHO-relevant warning symptoms: ${warningSigns.join(", ")}` : null,
     ].filter(Boolean),
   };
@@ -247,14 +251,19 @@ const generateGraphExplanation = (symptomIds, paths, whoGuidance, critical) => {
     traversalSummary: lines,
     whoRules: whoGuidance.matched,
     criticalPhase: critical.detected,
-    graphPathLabels: ["Symptom", "WHO Warning Sign", "Critical Phase", "Hospitalization Recommendation"],
+    graphPathLabels: [
+      "Symptom",
+      "WHO Warning Sign",
+      "Possible Critical Phase Transition",
+      "Hospitalization Recommendation",
+    ],
   };
 };
 
 const buildReasoningBullets = (symptomIds, paths, critical, whoGuidance, mlResult) => {
   const bullets = [];
   if (symptomIds.includes("fever_drop")) {
-    bullets.push("fever_drop indicates dengue critical transition");
+    bullets.push("fever_drop may indicate possible transition toward dengue critical phase");
   }
   if (symptomIds.includes("abdominal_pain") && whoGuidance.matched.includes("warning_sign")) {
     bullets.push("abdominal_pain matched WHO warning graph");
@@ -271,7 +280,9 @@ const buildReasoningBullets = (symptomIds, paths, critical, whoGuidance, mlResul
     }
   }
   if (critical.detected) {
-    bullets.push("Critical phase pattern detected on day " + (mlResult?.day || ""));
+    bullets.push(
+      "Possible transition toward dengue critical phase detected on day " + (mlResult?.day || "")
+    );
   }
   if (mlResult?.risk_level) {
     bullets.push(`XGBoost severity model: ${mlResult.risk_level} (score ${mlResult.risk_score})`);
@@ -282,13 +293,14 @@ const buildReasoningBullets = (symptomIds, paths, critical, whoGuidance, mlResul
 const generateClinicalReasoning = async (context) => {
   const groq = getGroq();
   const fallback =
-    "Possible transition into dengue critical phase detected due to fever drop and abdominal pain. WHO warning-sign pathway matched. Immediate hospital observation is recommended.";
+    "Your symptoms may indicate elevated dengue risk based on WHO warning patterns. A possible transition toward the critical phase was detected. Clinical confirmation and laboratory testing are recommended.";
 
   if (!groq) {
     return { narrative: fallback, model: "rule-based-fallback" };
   }
 
-  const prompt = `You are a WHO-aligned dengue clinical intelligence assistant. Be professional, concise, explainable, and healthcare-safe. Do not diagnose definitively.
+  const prompt = `You are a WHO-aligned dengue clinical intelligence assistant. Be professional, concise, explainable, and healthcare-safe.
+NEVER state definitive diagnosis (e.g. "you definitely have severe dengue"). Use probabilistic language: "may indicate elevated risk", "clinical confirmation recommended".
 
 Patient context:
 - Day of illness: ${context.day}
@@ -329,7 +341,7 @@ const fetchMlPrediction = async (symptoms, day, extras) => {
   } catch (err) {
     console.warn("[GraphRAG] ML API unavailable:", err.message);
     const score = Math.min(
-      100,
+      85,
       payload.day * 8 +
         (payload.abdominal_pain ? 15 : 0) +
         (payload.vomiting ? 12 : 0) +
@@ -373,7 +385,9 @@ const deriveOutputs = (symptomIds, paths, critical, whoGuidance, pathways, mlRes
   const hasEmergency = pathways.actions.includes("emergency_referral") || whoGuidance.matched.includes("emergency_sign");
   const hasCritical = critical.detected || pathways.risks.some((r) => r.id === "critical_phase");
 
-  const risk = hasCritical ? "Critical Phase" : pathways.risks[0]?.id?.replace(/_/g, " ") || "Monitoring Phase";
+  const risk = hasCritical
+    ? "Possible Critical Phase Transition"
+    : pathways.risks[0]?.id?.replace(/_/g, " ") || "Monitoring Phase";
   const severity =
     mlResult?.risk_level === "HIGH" || hasEmergency
       ? "High"
@@ -382,16 +396,16 @@ const deriveOutputs = (symptomIds, paths, critical, whoGuidance, pathways, mlRes
         : "Low";
 
   const recommendation = hasEmergency
-    ? "Emergency referral required immediately"
+    ? "Urgent clinical evaluation recommended — WHO emergency sign pattern identified"
     : hasCritical
-      ? "Immediate hospital observation recommended"
+      ? "Possible severe dengue progression detected — clinical confirmation recommended"
       : pathways.actions.includes("hydration")
         ? "Increase hydration and monitor symptoms every 12 hours"
         : "Continue monitoring and repeat assessment if symptoms worsen";
 
   const formatRisk = (raw) => {
-    if (hasCritical) return "Critical Phase";
-    if (hasEmergency) return "Severe Dengue Emergency";
+    if (hasCritical) return "Possible Critical Phase Transition";
+    if (hasEmergency) return "Elevated Severe Dengue Risk Suspicion";
     return String(raw || "Monitoring Phase")
       .split("_")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
@@ -473,16 +487,48 @@ const runHybridAnalysis = async (input) => {
 
   const confidence = computeConfidence(symptoms, graphAnalysis.paths, critical, mlResult);
 
+  const assessment = calculateClinicalRisk({
+    current: {
+      temperature: Number(input.temperature || input.temp || 0),
+      dayOfIllness: day,
+      symptoms,
+      labData: input.labData || input.labs || input.extras?.labData,
+    },
+    previous: null,
+    mlResult,
+    graphSignals: {
+      engine: graphAnalysis.engine,
+      day,
+      criticalPhase: critical,
+      whoGuidance,
+      pathways,
+      recommendation: derived.recommendation,
+      severity: derived.severity,
+    },
+  });
+
   const response = {
     success: true,
-    risk: derived.risk,
-    severity: derived.severity,
+    risk: assessment.displayTitle || assessment.severityLabel,
+    severity: assessment.severity,
+    severityLabel: assessment.severityLabel,
+    displayTitle: assessment.displayTitle,
+    riskScore: assessment.riskScore,
+    riskLevel: assessment.riskLevel,
+    riskMode: assessment.riskMode,
+    labPending: assessment.labPending,
+    aiConfidenceLabel: assessment.aiConfidenceLabel,
+    clinicalSubtitle: assessment.clinicalSubtitle,
+    medicalDisclaimer: assessment.medicalDisclaimer,
+    triggeredFactors: assessment.triggeredFactors,
     warning: derived.warning,
-    recommendation: derived.recommendation,
+    recommendation: assessment.recommendations?.[0] || derived.recommendation,
     confidence,
+    aiConfidence: assessment.aiConfidence,
     reasoning,
     graphPath: graphExplanation.graphPathLabels,
     narrative: clinical.narrative,
+    finalReasoning: assessment.finalReasoning,
     engine: graphAnalysis.engine,
     neo4jConnected: isConnected(),
     ml: {
@@ -523,6 +569,7 @@ module.exports = {
   detectCriticalPhase,
   getWHOGuidance,
   getRiskPathways,
+  buildReasoningBullets,
   generateClinicalReasoning,
   generateGraphExplanation,
   getFullGraphVisualization,

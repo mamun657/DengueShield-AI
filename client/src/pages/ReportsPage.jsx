@@ -7,34 +7,25 @@ import RiskSummary from "../components/RiskSummary";
 import TrendChart from "../components/TrendChart";
 import MedicalReportDownload from "../components/MedicalReportDownload";
 import { normalizeTrackingRecords } from "../utils/tracking";
-
-const demoReport = {
-  riskScore: 81,
-  riskLevel: "HIGH",
-  symptoms: ["Headache", "Vomiting", "Bleeding"],
-  summary: "High risk dengue clinical assessment. Monitor closely and follow recommended actions.",
-  reportText:
-    "Assessment Summary: High risk dengue clinical assessment.\nDetected Warning Signs: Headache, Vomiting, Bleeding\nAI Risk Score: 81/100 (HIGH)\nRecommended Action: Immediate CBC monitoring advised.\nWHO Guidance: Maintain hydration and seek clinical care if symptoms worsen.\nWHO Guidance (Bangla): WHO মির্দেশনা: পানি ও বিশ্রাম, প্রয়োজন হলে দ্রুত চিকিৎসা নিন।\nEmergency Advice: Seek urgent care for persistent vomiting, bleeding, severe abdominal pain.",
-  updatedAt: new Date().toISOString(),
-  createdAt: new Date().toISOString(),
-  nearestHospitals: [{ name: "Demo Hospital A" }, { name: "Demo Hospital B" }, { name: "Demo Hospital C" }],
-};
-
-const demoPatient = {
-  name: "Demo Patient",
-  email: "demo@patient.local",
-  pregnancyStatus: false,
-  dayOfIllness: 4,
-  updatedAt: new Date().toISOString(),
-};
+import { useClinicalStore } from "../store/useClinicalStore.jsx";
+import { getReportSnapshot, logPreviousReportRender } from "../utils/assessment";
+import { formatClinicalRisk, MEDICAL_DISCLAIMER, shouldShowElevatedCare } from "../utils/clinicalRisk";
 
 
 const ReportsPage = () => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
+  const {
+    latestAssessment,
+    latestTracking,
+    latestRecord,
+    latestReport,
+    setLatestAssessment,
+    setLatestTracking,
+    setLatestRecord,
+    setLatestReport,
+  } = useClinicalStore();
 
-  const [latestReport, setLatestReport] = useState(null);
-  const [trackingRecords, setTrackingRecords] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -60,11 +51,18 @@ const ReportsPage = () => {
         setHistory(Array.isArray(historyRes?.data) ? historyRes.data : []);
 
         const records = Array.isArray(dashboardRes?.data?.records) ? dashboardRes.data.records : [];
-        setTrackingRecords(normalizeTrackingRecords(records, 3));
+        const latest = records[records.length - 1] || null;
+        setLatestRecord(latest);
+        const assessment =
+          dashboardRes?.data?.latestAssessment || latest?.computed || null;
+        setLatestAssessment(assessment);
+        setLatestTracking(normalizeTrackingRecords(records, records.length || 1));
       } catch (e) {
         setError(e?.response?.data?.message || "Unable to load reports.");
         setLatestReport(null);
-        setTrackingRecords([]);
+        setLatestRecord(null);
+        setLatestAssessment(null);
+        setLatestTracking([]);
         setHistory([]);
       } finally {
         setLoading(false);
@@ -74,30 +72,64 @@ const ReportsPage = () => {
     load();
   }, []);
 
-  const resolvedLatestReport = latestReport || demoReport;
+  const resolvedLatestReport = latestReport || null;
   const resolvedPatient = useMemo(
     () => ({
-      name: user?.name || demoPatient.name,
-      email: user?.email || user?.id || user?._id || demoPatient.email,
-      pregnancyStatus: resolvedLatestReport?.pregnancyStatus ?? resolvedLatestReport?.pregnancy_status ?? demoPatient.pregnancyStatus,
+      name: user?.name || latestRecord?.user?.name || "Unknown Patient",
+      email: user?.email || user?.id || user?._id || latestRecord?.user?.email || "No email",
+      pregnancyStatus:
+        latestRecord?.pregnancyStatus ??
+        resolvedLatestReport?.pregnancyStatus ??
+        resolvedLatestReport?.pregnancy_status ??
+        false,
       dayOfIllness:
-        resolvedLatestReport?.dayOfIllness ?? resolvedLatestReport?.day_of_illness ?? demoPatient.dayOfIllness,
-      updatedAt: resolvedLatestReport?.updatedAt ?? demoPatient.updatedAt,
+        latestRecord?.dayOfIllness ??
+        resolvedLatestReport?.dayOfIllness ??
+        resolvedLatestReport?.day_of_illness ??
+        "-",
+      updatedAt:
+        resolvedLatestReport?.updatedAt ??
+        latestRecord?.updatedAt ??
+        latestRecord?.createdAt,
     }),
-    [user, resolvedLatestReport]
+    [user, latestRecord, resolvedLatestReport]
   );
 
-  const resolvedTracking = Array.isArray(trackingRecords) ? trackingRecords : [];
+  const resolvedTracking = Array.isArray(latestTracking) ? latestTracking : [];
 
-  // Console debug to confirm click behavior + rendering.
+  const snapshot = getReportSnapshot(resolvedLatestReport);
+  const reportClinical = formatClinicalRisk({
+    riskScore: snapshot?.riskScore,
+    riskLevel: snapshot?.riskLevel,
+    severityLabel: resolvedLatestReport?.severityLabel || snapshot?.riskLevel,
+    displayTitle: resolvedLatestReport?.displayTitle,
+    aiConfidenceLabel: resolvedLatestReport?.aiConfidenceLabel,
+    labPending: resolvedLatestReport?.labPending,
+    clinicalSubtitle: resolvedLatestReport?.clinicalSubtitle,
+    triggeredFactors: resolvedLatestReport?.triggeredFactors,
+    recommendations: resolvedLatestReport?.recommendations,
+    medicalDisclaimer: resolvedLatestReport?.medicalDisclaimer,
+  });
+  const riskScore = snapshot?.riskScore ?? null;
+  const riskLevel = snapshot?.riskLevel ?? "LOW";
+  const isElevated = shouldShowElevatedCare({
+    riskScore,
+    riskMode: resolvedLatestReport?.riskMode,
+    labPending: resolvedLatestReport?.labPending,
+  });
+
   useEffect(() => {
-    console.log("ReportsPage mounted. latestReport:", latestReport);
-  }, [latestReport]);
-
-  const riskScore = resolvedLatestReport?.riskScore ?? resolvedLatestReport?.risk_score ?? 0;
-  const riskLevel = resolvedLatestReport?.riskLevel ?? resolvedLatestReport?.risk_level ?? "LOW";
-
-  const isEmergency = Number(riskScore) > 85;
+    if (!resolvedLatestReport) return;
+    console.log(
+      "[REPORT RENDER]",
+      "rendering report:",
+      resolvedLatestReport._id,
+      "riskScore:",
+      resolvedLatestReport.riskScore,
+      "createdAt:",
+      resolvedLatestReport.createdAt
+    );
+  }, [resolvedLatestReport]);
 
   return (
     <div className="min-h-screen bg-[#0f172a]">
@@ -124,21 +156,20 @@ const ReportsPage = () => {
           </div>
         </div>
 
-        {isEmergency && (
-          <div className="mt-5 rounded-2xl border border-red-500/40 bg-red-500/10 p-5 text-red-200 shadow-[0_0_30px_rgba(239,68,68,0.35)]">
+        {isElevated && (
+          <div className="mt-5 rounded-2xl border border-amber-500/35 bg-amber-500/10 p-5 text-amber-100">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-red-300">Emergency Mode</p>
+                <p className="text-xs uppercase tracking-[0.3em] text-amber-200">Elevated clinical suspicion</p>
                 <h2 className="mt-2 text-xl font-semibold text-white">
-                  
-de9 SEEK IMMEDIATE MEDICAL CARE
+                  {reportClinical?.displayTitle || "Estimated Severe Dengue Risk"}
                 </h2>
-                <p className="mt-2 text-sm text-red-200">
-                  Risk score indicates a critical phase. Proceed to nearest hospital now.
+                <p className="mt-2 text-sm text-amber-100">
+                  Based on symptom progression and WHO warning signs. Clinical confirmation recommended.
                 </p>
               </div>
-              <div className="text-3xl font-semibold">
-                {Math.round(Number(riskScore) || 0)}
+              <div className="text-2xl font-semibold tabular-nums text-white">
+                {reportClinical?.scoreLine || `${Math.round(Number(riskScore) || 0)}/100`}
               </div>
             </div>
           </div>
@@ -150,13 +181,31 @@ de9 SEEK IMMEDIATE MEDICAL CARE
           </div>
         )}
 
+        {!loading && !resolvedLatestReport && (
+          <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-slate-300">
+            No clinical reports yet. Generate a report from the dashboard after saving today’s symptoms.
+          </div>
+        )}
+
         <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
           <section className="rounded-2xl border border-white/10 bg-[#1e293b] p-6 shadow-md">
             <RiskSummary
+              assessment={{
+                riskScore,
+                riskLevel,
+                severityLabel: resolvedLatestReport?.severityLabel || riskLevel,
+                displayTitle: resolvedLatestReport?.displayTitle,
+                aiConfidenceLabel: resolvedLatestReport?.aiConfidenceLabel,
+                labPending: resolvedLatestReport?.labPending,
+                clinicalSubtitle: resolvedLatestReport?.clinicalSubtitle,
+                triggeredFactors: resolvedLatestReport?.triggeredFactors,
+                recommendations: resolvedLatestReport?.recommendations,
+                medicalDisclaimer: resolvedLatestReport?.medicalDisclaimer || MEDICAL_DISCLAIMER,
+              }}
               riskScore={riskScore}
               riskLevel={riskLevel}
-              translatedRiskLevel={riskLevel}
-              alerts={isEmergency ? ["Emergency risk detected"] : []}
+              translatedRiskLevel={resolvedLatestReport?.severityLabel || riskLevel}
+              alerts={isElevated ? ["Elevated dengue risk suspicion — lab confirmation advised"] : []}
             />
 
             <div className="mt-5">
@@ -169,7 +218,10 @@ de9 SEEK IMMEDIATE MEDICAL CARE
 
               <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-4">
                 <p className="text-sm text-gray-200">
-                  {resolvedLatestReport?.summary || resolvedLatestReport?.reportText || "Clinical summary unavailable."}
+                  {snapshot?.clinicalSummary ||
+                    resolvedLatestReport?.summary ||
+                    resolvedLatestReport?.reportText ||
+                    "Clinical summary unavailable."}
                 </p>
               </div>
             </div>
@@ -177,36 +229,84 @@ de9 SEEK IMMEDIATE MEDICAL CARE
             <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4">
               <p className="text-xs uppercase tracking-wider text-slate-400">{t("whoGuidance", { defaultValue: "WHO guidance" })}</p>
               <p className="mt-2 text-sm text-slate-200">
-                {(resolvedLatestReport?.whoGuidance || resolvedLatestReport?.who_guidance || "Maintain hydration, monitor symptoms, and seek clinical care if worsening.")}
+                {(snapshot?.whoGuidance ||
+                  resolvedLatestReport?.whoGuidance ||
+                  "Maintain hydration, monitor symptoms, and seek clinical care if worsening.")}
               </p>
             </div>
           </section>
 
           <section className="rounded-2xl border border-white/10 bg-[#1e293b] p-6 shadow-md">
-            <h2 className="text-xl font-semibold text-white">{t("trendTitle", { defaultValue: "3-day trend" })}</h2>
+            <h2 className="text-xl font-semibold text-white">
+              {t("trendTitle", {
+                defaultValue: `${resolvedTracking.length} day${resolvedTracking.length === 1 ? "" : "s"} trend`,
+              })}
+            </h2>
             <p className="text-sm text-gray-300 mt-1">{t("trendSubtitle", { defaultValue: "Temperature & risk progression" })}</p>
             <div className="mt-4">
-              <TrendChart records={resolvedTracking} />
+              {resolvedTracking.length > 0 ? (
+                <TrendChart records={resolvedTracking} />
+              ) : (
+                <div className="rounded-xl border border-dashed border-white/10 bg-black/20 p-6 text-center text-sm text-slate-400">
+                  No tracking history yet. Save daily records to build a real trend line.
+                </div>
+              )}
             </div>
 
             <div className="mt-6">
               <h2 className="text-lg font-semibold text-white">{t("symptomTimeline", { defaultValue: "Symptom timeline" })}</h2>
               <div className="mt-3 space-y-2">
-                {(resolvedTracking || []).slice(-3).map((r, idx) => (
-                  <div key={idx} className="rounded-lg border border-white/10 bg-black/20 p-3">
-                    <p className="text-xs text-slate-400">
-                      {r?.dayOfIllness || r?.day || idx + 1 ? `Day ${r.dayOfIllness || r.day || idx + 1}` : "Day"}
-                      {r?.date ? ` • ${new Date(r.date).toLocaleDateString()}` : ""}
-                    </p>
-                    <p className="text-sm text-slate-200">
-                      Symptoms: {Array.isArray(r?.symptoms) ? r.symptoms.join(", ") : r?.symptoms || "None"}
-                    </p>
+                {resolvedTracking.length > 0 ? (
+                  resolvedTracking.slice(-3).map((r, idx) => (
+                    <div key={idx} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <p className="text-xs text-slate-400">
+                        {r?.dayOfIllness || r?.day || idx + 1 ? `Day ${r.dayOfIllness || r.day || idx + 1}` : "Day"}
+                        {r?.date ? ` • ${new Date(r.date).toLocaleDateString()}` : ""}
+                      </p>
+                      <p className="text-sm text-slate-200">
+                        Symptoms: {Array.isArray(r?.symptoms) ? r.symptoms.join(", ") : r?.symptoms || "None"}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm text-slate-400">
+                    No symptom timeline yet.
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </section>
         </div>
+
+        {history.length > 1 && (
+          <section className="mt-6 rounded-2xl border border-white/10 bg-[#1e293b] p-6 shadow-md">
+            <h2 className="text-xl font-semibold text-white">Report history</h2>
+            <p className="mt-1 text-sm text-slate-400">Immutable snapshots — scores never change retroactively.</p>
+            <div className="mt-4 space-y-3">
+              {history.map((report) => {
+                logPreviousReportRender(report);
+                return (
+                  <div
+                    key={report._id}
+                    className="rounded-xl border border-white/10 bg-black/20 p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm text-white">
+                        {new Date(report.createdAt).toLocaleString()} — Day {report.dayOfIllness ?? "—"}
+                      </p>
+                      <p className="text-sm font-semibold text-cyan-200">
+                        {Math.round(report.riskScore ?? 0)}/100 · {report.riskLevel}
+                      </p>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-400">
+                      Symptoms: {(report.symptoms || []).join(", ") || "None"}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         <section className="mt-6 rounded-2xl border border-white/10 bg-[#1e293b] p-6 shadow-md relative">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">

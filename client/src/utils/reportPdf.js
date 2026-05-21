@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { MEDICAL_DISCLAIMER } from "./clinicalRisk";
 import { normalizeTrackingRecords } from "./tracking";
 
 const formatDateTime = (value) => {
@@ -11,9 +12,10 @@ const formatDateTime = (value) => {
 
 const getRiskBadge = (riskLevel) => {
   const l = String(riskLevel || "").toUpperCase();
-  if (l === "CRITICAL" || l === "HIGH") return { label: l || "CRITICAL", color: [239, 68, 68] };
-  if (l === "MODERATE" || l === "MEDIUM") return { label: l || "MODERATE", color: [245, 158, 11] };
-  return { label: l || "LOW", color: [16, 185, 129] };
+  if (l.includes("SEVERE") || l === "CRITICAL") return { label: "Severe Risk", color: [239, 68, 68] };
+  if (l.includes("HIGH") || l.includes("SUSPICION")) return { label: "High Suspicion", color: [249, 115, 22] };
+  if (l === "MODERATE" || l === "MEDIUM") return { label: "Moderate", color: [245, 158, 11] };
+  return { label: "Low", color: [16, 185, 129] };
 };
 
 const getText = (t, fallback = "") => (t == null ? fallback : String(t));
@@ -30,6 +32,63 @@ const ensureSpace = (doc, y, needed, pageBottom = 90) => {
 const splitByWidth = (doc, text, width) => {
   const raw = getText(text, "N/A");
   return doc.splitTextToSize(raw, Math.max(40, width));
+};
+
+const normalizeBulletText = (value) => {
+  const cleaned = String(value || "")
+    .replace(/\u200B|\u200C|\u200D|\uFEFF/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*→\s*/g, " → ")
+    .trim();
+  return cleaned ? `${cleaned.charAt(0).toUpperCase()}${cleaned.slice(1)}` : "";
+};
+
+const addBulletListParagraph = (doc, y, left, right, label, items, fallback) => {
+  const boxPad = 10;
+  const contentWidth = right - left - boxPad * 2;
+  const itemIndent = 8;
+  const lineHeight = 14;
+  const candidateItems = Array.isArray(items) && items.length ? items : [fallback];
+  const listItems = candidateItems
+    .map((item) => normalizeBulletText(item))
+    .filter(Boolean);
+
+  const wrappedItems = listItems.map((item) => {
+    const lines = splitByWidth(doc, item, contentWidth - itemIndent);
+    return Array.isArray(lines) ? lines : [String(lines)];
+  });
+
+  const totalLines = wrappedItems.reduce((count, lines) => count + lines.length, 0);
+  const boxHeight = totalLines * lineHeight + 28;
+
+  y = ensureSpace(doc, y, boxHeight + 10);
+
+  doc.setDrawColor(226, 232, 240);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(left, y, right - left, boxHeight, 4, 4, "FD");
+  doc.setFont("helvetica", "normal");
+  doc.setCharSpace(0);
+  doc.setFontSize(11);
+  doc.setTextColor(100, 116, 139);
+  doc.text(label, left + boxPad, y + 16);
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+
+  let contentY = y + 30;
+  for (const itemLines of wrappedItems) {
+    itemLines.forEach((line, index) => {
+      const textValue = normalizeBulletText(line);
+      if (index === 0) {
+        doc.text(`• ${textValue}`, left + boxPad, contentY);
+      } else {
+        doc.text(textValue, left + boxPad + itemIndent, contentY);
+      }
+      contentY += lineHeight;
+    });
+    contentY += 3;
+  }
+
+  return y + boxHeight + 8;
 };
 
 const drawSectionHeader = (doc, y, title, left = 36, right = doc.internal.pageSize.getWidth() - 36) => {
@@ -54,16 +113,25 @@ const tryExtractReportSections = (report) => {
 
   const sections = {
     "Assessment Summary": report?.summary || "Clinical assessment summary unavailable.",
-    "Detected Warning Signs": (report?.symptoms || []).join(", ") || "None reported.",
+    "Detected Warning Signs":
+      (report?.detectedWarnings || report?.symptoms || []).join(", ") || "None reported.",
     "AI Risk Score": Number.isFinite(report?.riskScore)
-      ? `${report.riskScore}/100 (${report.riskLevel})`
+      ? `${report.riskScore}/100 — ${report.severityLabel || report.riskLevel} (estimated, not confirmed)`
       : "Not available",
-    "Recommended Action": "Continue hydration, monitor temperature, and recheck symptoms every 12-24 hours.",
-    "WHO Guidance": "Maintain hydration, monitor platelet count, and seek immediate clinical care if bleeding or abdominal pain develops.",
+    "Recommended Action":
+      (report?.recommendations || []).join(" ") ||
+      "Continue hydration, monitor temperature, and recheck symptoms every 12-24 hours.",
+    "WHO Guidance":
+      report?.whoGuidance ||
+      "Maintain hydration, monitor platelet count, and seek immediate clinical care if bleeding or abdominal pain develops.",
     // Fastest hackathon-safe option: remove Bangla from PDF export to avoid corrupted Unicode.
     "WHO Guidance (Bangla)": "", 
-    "Emergency Advice": "Seek urgent care for persistent vomiting, bleeding, severe abdominal pain, or drowsiness.",
-    "Disclaimer": "This AI-generated report is informational and does not replace a licensed physician.",
+    "Emergency Advice":
+      report?.emergencyAdvice ||
+      "Seek urgent care for persistent vomiting, bleeding, severe abdominal pain, or drowsiness.",
+    "Disclaimer":
+      report?.medicalDisclaimer ||
+      MEDICAL_DISCLAIMER,
   };
 
   for (const line of lines) {
@@ -89,11 +157,11 @@ const tryExtractReportSections = (report) => {
 const getPatientInfo = (patient, report) => {
   const name = getText(patient?.name || patient?.fullName || patient?.full_name, "Unknown");
   const email = getText(patient?.email, "No email");
-  const pregnancyStatus = patient?.pregnancyStatus ?? patient?.pregnancy_status;
+  const pregnancyStatus =
+    report?.pregnancyStatus ?? patient?.pregnancyStatus ?? patient?.pregnancy_status;
   const pregnancyText = pregnancyStatus === true ? "Yes" : pregnancyStatus === false ? "No" : "N/A";
 
-  const latestUpdatedAt =
-    report?.updatedAt || report?.createdAt || patient?.updatedAt || patient?.createdAt || "N/A";
+  const latestUpdatedAt = report?.createdAt || patient?.updatedAt || patient?.createdAt || "N/A";
 
   const riskLevel = report?.riskLevel || report?.risk_level || "LOW";
   const riskScore = report?.riskScore ?? report?.risk_score ?? 0;
@@ -157,7 +225,12 @@ const drawInfoColumn = (doc, { x, y, width, rows, labelWidth = 78 }) => {
  * @param {Array} params.trackingRecords - 3-day trend records (optional)
  * @param {Array} params.history - patient monitoring history (optional)
  */
-export const generateMedicalReportPdf = ({ patient, latestReport, trackingRecords = [], history = [] }) => {
+export const generateMedicalReportPdf = ({
+  patient,
+  latestReport,
+  trackingRecords = [],
+  history = [],
+}) => {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -186,17 +259,20 @@ export const generateMedicalReportPdf = ({ patient, latestReport, trackingRecord
 
   const colGap = 16;
   const colWidth = (right - left - colGap) / 2;
+  const severityLabel = latestReport?.severityLabel || p.riskLevel;
+  const displayTitle = latestReport?.displayTitle || severityLabel;
   const leftRows = [
     { k: "Full Name", v: p.name },
-    { k: "Risk Score", v: `${p.riskScore}/100` },
+    { k: "Estimated Risk", v: `${p.riskScore}/100 — ${severityLabel}` },
     { k: "Day of Illness", v: String(p.dayOfIllness) },
-    { k: "Last Updated", v: formatDateTime(p.updatedAt) },
+    { k: "Report Date", v: formatDateTime(p.updatedAt) },
   ];
   const rightRows = [
     { k: "Email", v: p.email },
-    { k: "Current Risk", v: p.riskLevel },
+    { k: "Risk Estimate", v: displayTitle },
+    { k: "AI Confidence", v: latestReport?.aiConfidenceLabel || "Moderate" },
     { k: "Pregnancy Status", v: p.pregnancyText },
-    { k: "Clinical State", v: Number(p.riskScore) > 85 ? "Emergency attention required" : "Stable monitoring" },
+    { k: "Lab Status", v: latestReport?.labPending ? "Pending — CBC/platelet advised" : "Included" },
   ];
 
   y = ensureSpace(doc, y, 170);
@@ -222,32 +298,43 @@ export const generateMedicalReportPdf = ({ patient, latestReport, trackingRecord
   const warningSigns = sectionMap["Detected Warning Signs"] || "None";
   const assessmentSummary = sectionMap["Assessment Summary"] || "";
   const recommendedAction = sectionMap["Recommended Action"] || "";
-  const criticalStatus = String(latestReport?.criticalPhaseStatus || "Stable monitoring");
+  const criticalStatus =
+    latestReport?.emergencyAdvice ||
+    "Monitoring — possible critical phase transition assessed probabilistically";
 
   const addParagraph = (label, text) => {
-    y = ensureSpace(doc, y, 70);
-    const lineHeight = 13;
-    const boxPad = 8;
+    y = ensureSpace(doc, y, 80);
+    const lineHeight = 14;
+    const boxPad = 10;
     const contentWidth = right - left - boxPad * 2;
     const lines = splitByWidth(doc, text, contentWidth);
-    const boxHeight = lines.length * lineHeight + 22;
+    const boxHeight = lines.length * lineHeight + 26;
 
     doc.setDrawColor(226, 232, 240);
     doc.setFillColor(255, 255, 255);
     doc.roundedRect(left, y, right - left, boxHeight, 4, 4, "FD");
-    doc.setFontSize(9);
+    doc.setFontSize(11);
     doc.setTextColor(100, 116, 139);
-    doc.text(label, left + boxPad, y + 14);
-    doc.setFontSize(10);
+    doc.text(label, left + boxPad, y + 16);
+    doc.setFontSize(11);
     doc.setTextColor(15, 23, 42);
-    doc.text(lines, left + boxPad, y + 28);
-    y += boxHeight + 8;
+    doc.text(lines, left + boxPad, y + 32);
+    y += boxHeight + 10;
   };
 
   addParagraph("Detected warning signs", warningSigns);
   addParagraph("AI assessment", assessmentSummary);
   addParagraph("AI recommendation", recommendedAction);
-  addParagraph("Critical phase status", criticalStatus);
+  addParagraph("Clinical phase assessment", criticalStatus);
+  y = addBulletListParagraph(
+    doc,
+    y,
+    left,
+    right,
+    "Triggered factors",
+    latestReport?.triggeredFactors,
+    "No significant WHO warning pathways detected."
+  );
 
   // Trend summary
   const source = normalizeTrackingRecords(trackingRecords, 3);
@@ -387,7 +474,10 @@ export const generateMedicalReportPdf = ({ patient, latestReport, trackingRecord
   y = ensureSpace(doc, y, 170);
 
   const riskNum = Number(latestReport?.riskScore ?? latestReport?.risk_score ?? 0);
-  const showEmergency = Number.isFinite(riskNum) && riskNum > 85;
+  const showEmergency =
+    latestReport?.riskMode === "lab-enhanced" && Number.isFinite(riskNum) && riskNum >= 90;
+  const showElevated =
+    !showEmergency && Number.isFinite(riskNum) && riskNum >= 61;
   y = drawSectionHeader(doc, y, "5. EMERGENCY ALERT", left, right);
 
   if (showEmergency) {
@@ -395,7 +485,7 @@ export const generateMedicalReportPdf = ({ patient, latestReport, trackingRecord
     doc.roundedRect(left, y, right - left, 32, 8, 8, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(12);
-    doc.text("EMERGENCY: SEEK IMMEDIATE MEDICAL CARE", left + 12, y + 21);
+    doc.text("URGENT: Severe dengue risk (lab-enhanced estimate)", left + 12, y + 21);
     y += 46;
 
     doc.setFontSize(10);
@@ -426,10 +516,19 @@ export const generateMedicalReportPdf = ({ patient, latestReport, trackingRecord
     doc.text("Visit the nearest available hospital immediately.", left, y);
     doc.setFont(undefined, "normal");
     y += 14;
+  } else if (showElevated) {
+    doc.setTextColor(180, 83, 9);
+    doc.setFontSize(10);
+    doc.text(
+      "Elevated dengue risk suspicion. Clinical confirmation and CBC/platelet testing recommended.",
+      left,
+      y
+    );
+    y += 20;
   } else {
     doc.setTextColor(15, 23, 42);
     doc.setFontSize(10);
-    doc.text("No emergency escalation required based on current risk.", left, y);
+    doc.text("Continue monitoring. Seek care if warning signs develop.", left, y);
     y += 20;
   }
 

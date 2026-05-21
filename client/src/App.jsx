@@ -1,6 +1,7 @@
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ClinicalStoreProvider } from "./store/useClinicalStore.jsx";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Footer from "./components/Footer";
 import LoginPage from "./pages/LoginPage";
@@ -117,9 +118,11 @@ const AppLayout = () => {
 
 const App = () => (
   <AuthProvider>
-    <BrowserRouter>
-      <AppLayout />
-    </BrowserRouter>
+    <ClinicalStoreProvider>
+      <BrowserRouter>
+        <AppLayout />
+      </BrowserRouter>
+    </ClinicalStoreProvider>
   </AuthProvider>
 );
 

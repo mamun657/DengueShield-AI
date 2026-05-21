@@ -1,7 +1,13 @@
 import api from "../api";
 
-export const analyzeGraphRag = async ({ symptoms, day, extras }) => {
-  const response = await api.post("/graphrag/analyze", { symptoms, day, extras });
+export const analyzeGraphRag = async ({ symptoms, day, extras, temperature, temp }) => {
+  const response = await api.post("/graphrag/analyze", {
+    symptoms,
+    day,
+    extras,
+    temperature: temperature ?? temp,
+    temp: temp ?? temperature,
+  });
   return response.data;
 };
 
