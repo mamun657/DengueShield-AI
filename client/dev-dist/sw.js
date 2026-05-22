@@ -81,7 +81,7 @@ define(['./workbox-bbbdf4d3'], (function (workbox) { 'use strict';
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
     "url": "/offline-fallback.html",
-    "revision": "0.0i876jb225s"
+    "revision": "0.tlrl7plvtg"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/offline-fallback.html"), {

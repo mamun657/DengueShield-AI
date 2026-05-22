@@ -7,7 +7,7 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "graph:seed": "node src/graph/seedKnowledgeGraph.js",
-    "test": "echo \"No tests yet\""
+    "test": "jest --runInBand"
   },
   "keywords": [],
   "author": "",
@@ -33,6 +33,7 @@
     "uuid": "^14.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "jest": "^29.7.0"
   }
 }

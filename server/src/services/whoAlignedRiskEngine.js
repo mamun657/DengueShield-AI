@@ -416,8 +416,8 @@ module.exports = {
   SYMPTOM_ONLY_MAX,
   LAB_CRITICAL_MIN,
   LOW_SPECIFICITY_WEIGHTS,
-  FEVER_TEMP_WEIGHTS,
-  ILLNESS_DAY_WEIGHTS,
+  calculateFeverWeight,
+  calculateDayWeight,
   WHO_WARNING_SIGNS,
   LABORATORY_WEIGHTS,
 };
