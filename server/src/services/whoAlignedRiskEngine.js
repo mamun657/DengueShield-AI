@@ -24,70 +24,34 @@ const MEDICAL_DISCLAIMER =
   "Symptoms may overlap with COVID-19, influenza, malaria, typhoid, and other febrile illnesses. " +
   "Laboratory confirmation via CBC, Platelet count, NS1 test, or physician evaluation is REQUIRED.";
 
-const SYMPTOM_ONLY_MAX = 85;  // Symptoms alone cannot produce clinical certainty
-const LAB_CRITICAL_MIN = 90;  // Lab evidence can escalate to critical range
+const SYMPTOM_ONLY_MAX = 75;  // Low-specificity symptoms alone cannot reach CRITICAL
+const LAB_CRITICAL_MIN = 76;
 
-/**
- * WEIGHTED SYMPTOM SCORES (Low Specificity Category)
- * Generic viral symptoms - present in many febrile illnesses
- */
 const LOW_SPECIFICITY_WEIGHTS = {
-  headache: 4,           // Generic viral symptom
-  body_pain: 5,          // Myalgia in many viral illnesses
-  fatigue: 4,            // Non-specific
-  appetite_loss: 3,      // Non-specific
-  eye_pain: 6,           // Retrobulbar pain, slightly more specific
-  rash: 6,               // Rash present in dengue but also in measles, chikungunya, others
+  headache: 5,
+  body_pain: 5,
+  fatigue: 4,
+  rash: 4,
+  eye_pain: 6,
+  appetite_loss: 4,
 };
 
-/**
- * FEVER TEMPERATURE WEIGHTS
- * Calibrated to dengue fever patterns (typically 38-41°C)
- */
-const FEVER_TEMP_WEIGHTS = {
-  // Below 99°F (37.2°C)
-  "below_99": 0,
-  // 99-100°F (37.2-37.8°C)
-  "99_100": 3,
-  // 100-101°F (37.8-38.3°C)
-  "100_101": 6,
-  // 101-102°F (38.3-38.9°C)
-  "101_102": 8,
-  // Above 102°F (38.9°C)
-  "above_102": 10,
-};
-
-/**
- * DAY OF ILLNESS WEIGHTS
- * Dengue critical phase typically appears days 3-7
- * Day 1: Initial febrile phase - lower suspicion
- * Days 2-3: Fever peak phase
- * Days 3-7: CRITICAL PHASE WINDOW (WHO guideline)
- * Day 7+: Defervescence phase - recovery
- */
-const ILLNESS_DAY_WEIGHTS = {
-  1: 1,    // Day 1: Early phase
-  2: 3,    // Day 2: Fever escalating
-  3: 7,    // Day 3: Critical phase begins
-  4: 12,   // Day 4: Peak critical risk
-  5: 12,   // Day 5: Peak critical risk
-  6: 10,   // Day 6: Still in critical window
-  7: 6,    // Day 7: Approaching recovery
-  8: 3,    // Day 8+: Post-critical phase
-};
-
-/**
- * WHO WARNING SIGN WEIGHTS
- * Strong associations with severe dengue progression
- * Source: WHO dengue clinical management guidelines
- */
 const WHO_WARNING_SIGNS = {
-  vomiting: 12,                    // Dehydration pathway
-  persistent_vomiting: 18,         // Severe dehydration risk
-  abdominal_pain: 18,              // Severe plasma leakage sign
-  restlessness: 15,                // CNS/circulatory compromise indicator
-  bleeding: 25,                    // CRITICAL: hemorrhagic progression
+  vomiting: 15,
+  abdominal_pain: 20,
+  restlessness: 18,
+  bleeding: 30,
 };
+
+const PREGNANCY_MONITORING_BOOST = 5;
+
+const hasSymptom = (symptoms, key) => {
+  const list = Array.isArray(symptoms) ? symptoms : [];
+  const variants = [key, key.replace(/_/g, " ")];
+  return variants.some((v) => list.includes(v));
+};
+
+const formatFactorExplanation = (weight, label) => `+${weight} ${label}`;
 
 /**
  * LABORATORY INDICATORS
@@ -102,28 +66,51 @@ const LABORATORY_WEIGHTS = {
   ast_alt_abnormal: 20,            // Hepatic dysfunction
 };
 
-/**
- * Calculate fever contribution based on temperature in Celsius
- */
 const calculateFeverWeight = (tempCelsius) => {
   const temp = Number(tempCelsius);
-  if (!Number.isFinite(temp)) return 0;
-  
-  if (temp < 37.2) return FEVER_TEMP_WEIGHTS["below_99"];
-  if (temp < 37.8) return FEVER_TEMP_WEIGHTS["99_100"];
-  if (temp < 38.3) return FEVER_TEMP_WEIGHTS["100_101"];
-  if (temp < 38.9) return FEVER_TEMP_WEIGHTS["101_102"];
-  return FEVER_TEMP_WEIGHTS["above_102"];
+  if (!Number.isFinite(temp) || temp <= 0) return { weight: 0, label: null };
+  const tempF = temp > 60 ? temp : (temp * 9) / 5 + 32;
+  if (tempF < 99) return { weight: 0, label: null };
+  if (tempF < 100) return { weight: 3, label: `Fever ${tempF.toFixed(1)}°F` };
+  if (tempF < 102) return { weight: 8, label: `Fever ${tempF.toFixed(1)}°F` };
+  if (tempF < 104) return { weight: 15, label: `High fever ${tempF.toFixed(1)}°F` };
+  return { weight: 15, label: `High fever ${tempF.toFixed(1)}°F` };
 };
 
-/**
- * Calculate illness day contribution
- */
 const calculateDayWeight = (dayOfIllness) => {
-  const day = Number(dayOfIllness);
-  if (!Number.isFinite(day) || day < 1) return ILLNESS_DAY_WEIGHTS[1];
-  if (day > 8) return ILLNESS_DAY_WEIGHTS[8];
-  return ILLNESS_DAY_WEIGHTS[day] || ILLNESS_DAY_WEIGHTS[8];
+  const day = Math.max(1, Number(dayOfIllness) || 1);
+  if (day <= 2) return { weight: 2, label: `Day ${day} early illness` };
+  if (day <= 5) return { weight: 10, label: `Day ${day} critical phase window` };
+  return { weight: 5, label: `Day ${day} late phase` };
+};
+
+const countWhoWarningSigns = (symptoms) =>
+  Object.keys(WHO_WARNING_SIGNS).filter((key) => hasSymptom(symptoms, key)).length;
+
+const applyClinicalSafetyCaps = (score, { symptoms, labData, hasLab }) => {
+  let finalScore = score;
+  const whoCount = countWhoWarningSigns(symptoms);
+  const hasBleeding = hasSymptom(symptoms, "bleeding");
+  const platelet = labData?.plateletCount != null ? Number(labData.plateletCount) : null;
+  const hasPlateletLab = platelet != null && Number.isFinite(platelet);
+
+  if (!hasLab && whoCount === 0) {
+    finalScore = Math.min(finalScore, 50);
+  } else if (!hasLab) {
+    finalScore = Math.min(finalScore, SYMPTOM_ONLY_MAX);
+  }
+
+  const canBeCritical =
+    hasBleeding ||
+    whoCount >= 2 ||
+    (hasPlateletLab && platelet < 50000) ||
+    (whoCount >= 1 && hasPlateletLab && platelet < 100000);
+
+  if (!canBeCritical) {
+    finalScore = Math.min(finalScore, 75);
+  }
+
+  return normalizeScore(finalScore);
 };
 
 /**
@@ -138,109 +125,121 @@ const normalizeScore = (value) => {
 /**
  * Build explainable reasoning for each factor
  */
-const buildExplainableFactors = (symptoms, tempCelsius, dayOfIllness, labData) => {
+const buildExplainableFactors = (symptoms, tempCelsius, dayOfIllness, labData, pregnancyStatus = false) => {
   const factors = [];
   const explanations = {};
   
-  // Low specificity symptoms
   Object.entries(LOW_SPECIFICITY_WEIGHTS).forEach(([symptom, weight]) => {
-    if ((symptoms || []).includes(symptom)) {
+    if (hasSymptom(symptoms, symptom)) {
       const key = symptom.replace(/_/g, " ");
       factors.push({
         factor: key,
         weight,
         category: "low-specificity",
-        explanation: `${key} → low-specificity viral symptom (also seen in COVID-19, influenza, malaria, typhoid)`
+        explanation: formatFactorExplanation(weight, key.charAt(0).toUpperCase() + key.slice(1)),
       });
     }
   });
-  
-  // Fever weight
-  const feverWeight = calculateFeverWeight(tempCelsius);
-  if (feverWeight > 0) {
-    const temp = Number(tempCelsius);
+
+  const fever = calculateFeverWeight(tempCelsius);
+  if (fever.weight > 0) {
     factors.push({
-      factor: `fever (${temp.toFixed(1)}°C)`,
-      weight: feverWeight,
+      factor: fever.label,
+      weight: fever.weight,
       category: "fever-severity",
-      explanation: `fever ${temp.toFixed(1)}°C → temperature severity factor (dengue typically 38-41°C)`
+      explanation: formatFactorExplanation(fever.weight, fever.label),
     });
   }
-  
-  // Illness day weight
-  const dayWeight = calculateDayWeight(dayOfIllness);
-  const day = Number(dayOfIllness);
+
+  const dayInfo = calculateDayWeight(dayOfIllness);
   factors.push({
-    factor: `day ${day} of illness`,
-    weight: dayWeight,
+    factor: dayInfo.label,
+    weight: dayInfo.weight,
     category: "illness-progression",
-    explanation: `day ${day} → ${day >= 3 && day <= 7 ? "WHO CRITICAL PHASE WINDOW" : "non-critical phase"}`
+    explanation: formatFactorExplanation(dayInfo.weight, dayInfo.label),
   });
-  
-  // WHO warning signs
+
   Object.entries(WHO_WARNING_SIGNS).forEach(([warning, weight]) => {
-    if ((symptoms || []).includes(warning.replace(/_/g, " "))) {
+    if (hasSymptom(symptoms, warning)) {
+      const key = warning.replace(/_/g, " ");
       factors.push({
-        factor: warning.replace(/_/g, " "),
+        factor: key,
         weight,
         category: "who-warning-sign",
-        explanation: `${warning.replace(/_/g, " ")} → WHO EMERGENCY WARNING SIGN (severe dengue progression indicator)`
+        explanation: formatFactorExplanation(weight, key.charAt(0).toUpperCase() + key.slice(1)),
       });
     }
   });
   
-  // Laboratory indicators
-  if (labData) {
-    if (labData.plateletCount < 100000) {
+  if (labData && labData.plateletCount != null && Number.isFinite(Number(labData.plateletCount))) {
+    const pc = Number(labData.plateletCount);
+    if (pc < 50000) {
       factors.push({
-        factor: `low platelets (${labData.plateletCount})`,
-        weight: LABORATORY_WEIGHTS.platelet_drop,
+        factor: `platelet ${pc}`,
+        weight: 35,
         category: "laboratory-critical",
-        explanation: `platelet count ${labData.plateletCount} → dengue-specific thrombocytopenia`
+        explanation: formatFactorExplanation(35, "Platelet count very low"),
       });
-    }
-    if (labData.hematocritRise > 20) {
+    } else if (pc < 100000) {
       factors.push({
-        factor: `hematocrit rise (${labData.hematocritRise}%)`,
-        weight: LABORATORY_WEIGHTS.hematocrit_rise,
+        factor: `platelet ${pc}`,
+        weight: 25,
         category: "laboratory-critical",
-        explanation: `hematocrit rise → plasma leakage / dengue hemorrhagic fever marker`
-      });
-    }
-    if (labData.fluidAccumulation) {
-      factors.push({
-        factor: "fluid accumulation",
-        weight: LABORATORY_WEIGHTS.fluid_accumulation,
-        category: "laboratory-critical",
-        explanation: `pleural effusion / ascites → severe dengue indicator`
-      });
-    }
-    if (labData.shock) {
-      factors.push({
-        factor: "shock",
-        weight: LABORATORY_WEIGHTS.shock,
-        category: "laboratory-emergency",
-        explanation: `dengue shock syndrome → MEDICAL EMERGENCY`
-      });
-    }
-    if (labData.severeBleeding) {
-      factors.push({
-        factor: "severe bleeding",
-        weight: LABORATORY_WEIGHTS.severe_bleeding,
-        category: "laboratory-emergency",
-        explanation: `severe hemorrhage → dengue hemorrhagic fever / dengue shock syndrome`
-      });
-    }
-    if (labData.astAltAbnormal) {
-      factors.push({
-        factor: "liver dysfunction",
-        weight: LABORATORY_WEIGHTS.ast_alt_abnormal,
-        category: "laboratory-critical",
-        explanation: `elevated AST/ALT → hepatic dysfunction in dengue`
+        explanation: formatFactorExplanation(25, "Low platelet count"),
       });
     }
   }
-  
+
+  if (labData?.hematocritRise > 20) {
+    factors.push({
+      factor: `hematocrit rise (${labData.hematocritRise}%)`,
+      weight: LABORATORY_WEIGHTS.hematocrit_rise,
+      category: "laboratory-critical",
+      explanation: formatFactorExplanation(LABORATORY_WEIGHTS.hematocrit_rise, "Hematocrit rise"),
+    });
+  }
+  if (labData?.fluidAccumulation) {
+    factors.push({
+      factor: "fluid accumulation",
+      weight: LABORATORY_WEIGHTS.fluid_accumulation,
+      category: "laboratory-critical",
+      explanation: formatFactorExplanation(LABORATORY_WEIGHTS.fluid_accumulation, "Fluid accumulation"),
+    });
+  }
+  if (labData?.shock) {
+    factors.push({
+      factor: "shock",
+      weight: LABORATORY_WEIGHTS.shock,
+      category: "laboratory-emergency",
+      explanation: formatFactorExplanation(LABORATORY_WEIGHTS.shock, "Shock"),
+    });
+  }
+  if (labData?.severeBleeding) {
+    factors.push({
+      factor: "severe bleeding",
+      weight: LABORATORY_WEIGHTS.severe_bleeding,
+      category: "laboratory-emergency",
+      explanation: formatFactorExplanation(LABORATORY_WEIGHTS.severe_bleeding, "Severe bleeding"),
+    });
+  }
+  if (labData?.astAltAbnormal) {
+    factors.push({
+      factor: "liver dysfunction",
+      weight: LABORATORY_WEIGHTS.ast_alt_abnormal,
+      category: "laboratory-critical",
+      explanation: formatFactorExplanation(LABORATORY_WEIGHTS.ast_alt_abnormal, "Liver dysfunction"),
+    });
+  }
+
+  if (pregnancyStatus) {
+    factors.push({
+      factor: "pregnancy",
+      weight: PREGNANCY_MONITORING_BOOST,
+      category: "pregnancy-monitoring",
+      explanation: formatFactorExplanation(PREGNANCY_MONITORING_BOOST, "Pregnancy monitoring"),
+    });
+  }
+
   return { factors, explanations };
 };
 
@@ -262,66 +261,47 @@ const calculateWhoAlignedRisk = ({ current, previous }) => {
   const labData = current?.labData || null;
   
   // Build explainable factors
-  const { factors } = buildExplainableFactors(symptoms, tempCelsius, dayOfIllness, labData);
-  
-  // Sum all weighted factors
+  const { factors } = buildExplainableFactors(
+    symptoms,
+    tempCelsius,
+    dayOfIllness,
+    labData,
+    !!current?.pregnancyStatus
+  );
+
   let totalScore = factors.reduce((sum, f) => sum + f.weight, 0);
-  
-  // Apply trend analysis
-  let trendBonus = 0;
+
   if (previous) {
     const tempTrend = Number(current.temperature) - Number(previous.temperature);
-    const symptomTrend = symptoms.length - (previous.symptoms?.length || 0);
-    
-    // Fever rising during critical phase = concerning
-    if (dayOfIllness >= 3 && dayOfIllness <= 7 && tempTrend > 0.5) {
-      trendBonus += 5;
-    }
-    
-    // Fever dropping during critical phase with warning signs = CRITICAL
-    if (dayOfIllness >= 3 && dayOfIllness <= 7 && tempTrend < -0.5) {
-      const hasWarnings = symptoms.some(s => Object.keys(WHO_WARNING_SIGNS).includes(s));
-      if (hasWarnings) {
-        trendBonus += 15;
-        factors.push({
-          factor: "fever drop during critical phase with warning signs",
-          weight: trendBonus,
-          category: "critical-phase-transition",
-          explanation: "Fever drop during WHO critical window with warning signs → SEVERE DENGUE PROGRESSION RISK"
-        });
-      }
-    }
-    
-    // Rapidly worsening symptom count = concerning
-    if (symptomTrend > 2) {
-      trendBonus += 8;
+    if (dayOfIllness >= 3 && dayOfIllness <= 7 && tempTrend < -0.5 && countWhoWarningSigns(symptoms) > 0) {
+      const bonus = 12;
+      totalScore += bonus;
+      factors.push({
+        factor: "fever drop with warning signs",
+        weight: bonus,
+        category: "critical-phase-transition",
+        explanation: formatFactorExplanation(bonus, "Fever drop with warning signs"),
+      });
     }
   }
-  
-  totalScore += trendBonus;
-  
-  // Apply caps
-  let finalScore = normalizeScore(totalScore);
-  
-  // Symptom-only assessment caps at SYMPTOM_ONLY_MAX
-  const hasLab = Boolean(labData && (labData.plateletCount || labData.hematocritRise || labData.astAltAbormal));
-  if (!hasLab) {
-    finalScore = Math.min(finalScore, SYMPTOM_ONLY_MAX);
-  } else {
-    // Lab evidence of severe indicators should reach critical range
-    const hasSevereLabIndicators = labData && (
-      labData.shock || 
-      labData.severeBleeding || 
-      (labData.plateletCount < 50000) ||
-      (labData.hematocritRise > 25)
-    );
-    if (hasSevereLabIndicators) {
-      finalScore = Math.max(finalScore, LAB_CRITICAL_MIN);
-    }
+
+  const hasLab = Boolean(
+    labData &&
+      (labData.plateletCount != null ||
+        labData.hematocritRise ||
+        labData.shock ||
+        labData.severeBleeding ||
+        labData.astAltAbnormal)
+  );
+
+  let finalScore = applyClinicalSafetyCaps(totalScore, { symptoms, labData, hasLab });
+
+  if (hasLab && labData && (labData.shock || labData.severeBleeding)) {
+    finalScore = Math.max(finalScore, LAB_CRITICAL_MIN);
   }
   
   // Map score to severity level
-  const severityMapping = mapScoreToSeverity(finalScore, hasLab);
+  const severityMapping = mapScoreToSeverity(finalScore);
   
   return {
     riskScore: finalScore,
@@ -341,8 +321,8 @@ const calculateWhoAlignedRisk = ({ current, previous }) => {
 /**
  * Map numeric score to clinical severity level
  */
-const mapScoreToSeverity = (score, hasLab) => {
-  if (score <= 20) {
+const mapScoreToSeverity = (score) => {
+  if (score <= 25) {
     return {
       riskLevel: "Low Suspicion",
       severityLabel: "Low",
@@ -350,17 +330,8 @@ const mapScoreToSeverity = (score, hasLab) => {
       category: "low-risk",
     };
   }
-  
-  if (score <= 40) {
-    return {
-      riskLevel: "Mild Suspicion",
-      severityLabel: "Mild",
-      displayTitle: "Mild Dengue Risk Suspicion",
-      category: "mild-risk",
-    };
-  }
-  
-  if (score <= 60) {
+
+  if (score <= 50) {
     return {
       riskLevel: "Moderate Suspicion",
       severityLabel: "Moderate",
@@ -368,20 +339,20 @@ const mapScoreToSeverity = (score, hasLab) => {
       category: "moderate-risk",
     };
   }
-  
-  if (score <= 80) {
+
+  if (score <= 75) {
     return {
       riskLevel: "High WHO Warning Risk",
       severityLabel: "High",
-      displayTitle: "High Dengue Risk Suspicion with WHO Warning Signs",
+      displayTitle: "High Dengue Risk Suspicion",
       category: "high-risk",
     };
   }
-  
+
   return {
     riskLevel: "Critical Severe Dengue Risk",
     severityLabel: "Critical",
-    displayTitle: "Critical Severe Dengue Risk - Immediate Clinical Evaluation Required",
+    displayTitle: "Critical Severe Dengue Risk — Immediate Evaluation Required",
     category: "critical-risk",
   };
 };

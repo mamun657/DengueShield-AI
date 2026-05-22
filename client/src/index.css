@@ -7,6 +7,34 @@ body {
   -moz-osx-font-smoothing: grayscale;
   margin: 0;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  word-break: normal;
+  overflow-wrap: break-word;
+  letter-spacing: normal;
+}
+
+.clinical-text,
+.clinical-text * {
+  word-break: normal;
+  overflow-wrap: break-word;
+  white-space: normal;
+  letter-spacing: normal;
+}
+
+/* Rural telehealth mode — low bandwidth, minimal motion */
+html.rural-mode *,
+html.rural-mode *::before,
+html.rural-mode *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+html.rural-mode .grid-overlay {
+  opacity: 0.05;
+}
+
+html.rural-mode img:not([data-essential]) {
+  loading: lazy;
 }
 
 body::before {

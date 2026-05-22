@@ -1,0 +1,20 @@
+{
+  "name": "DengueShield AI — Rural Telehealth",
+  "short_name": "DengueShield",
+  "description": "Offline-capable dengue clinical risk estimation and WHO-aligned telehealth",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#2563eb",
+  "background_color": "#061120",
+  "categories": ["health", "medical"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

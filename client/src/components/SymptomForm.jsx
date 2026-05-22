@@ -20,6 +20,7 @@ const SymptomForm = ({ onSubmit }) => {
     temperature: "",
     dayOfIllness: "",
     fluidIntakeLiters: "",
+    plateletCount: "",
     pregnancyStatus: false,
     symptoms: [],
   });
@@ -69,6 +70,15 @@ const SymptomForm = ({ onSubmit }) => {
             step="0.1"
             placeholder={t("fluidIntake")}
             onChange={(e) => setForm({ ...form, fluidIntakeLiters: e.target.value })}
+          />
+        </label>
+        <label className="space-y-2 text-sm text-gray-300">
+          <span>Platelet count (optional, offline/CBC)</span>
+          <input
+            className="w-full rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600"
+            type="number"
+            placeholder="e.g. 85000"
+            onChange={(e) => setForm({ ...form, plateletCount: e.target.value })}
           />
         </label>
         <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-sm text-gray-300">

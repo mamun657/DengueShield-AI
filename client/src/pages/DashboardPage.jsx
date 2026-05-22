@@ -2,7 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
 import api from "../api";
+import {
+  loadDashboardData,
+  submitSymptomRecord,
+  generateReport,
+  getOfflineNearbyHospitals,
+  isNetworkOnline,
+} from "../services/offlineApi";
 import { useAuth } from "../context/AuthContext";
+import { useOfflineStatus } from "../hooks/useOfflineStatus";
+import OfflineStatusBanner from "../components/offline/OfflineStatusBanner";
+import RuralModeToggle from "../components/offline/RuralModeToggle";
+import OfflineLiteBadge from "../components/offline/OfflineLiteBadge";
+import CompactHospitalSection from "../components/clinical/CompactHospitalSection";
+import { generateMedicalReportPdf } from "../utils/reportPdf";
 import DashboardNavbar from "../components/DashboardNavbar";
 import RiskSummary from "../components/RiskSummary";
 import SymptomForm from "../components/SymptomForm";
@@ -15,7 +28,6 @@ import { resolveUnifiedAssessment, logPreviousReportRender } from "../utils/asse
 import {
   formatClinicalRisk,
   shouldShowElevatedCare,
-  shouldShowLabCritical,
 } from "../utils/clinicalRisk";
 
 const sanitizeReportText = (text) =>
@@ -292,6 +304,9 @@ const ReportSections = ({ report, density = "full", className = "" }) => {
 const DashboardPage = () => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
+  const { isOnline, userId: offlineUserId } = useOfflineStatus();
+  const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
+  const [hospitalSearchLoading, setHospitalSearchLoading] = useState(false);
   const {
     latestAssessment,
     currentRisk,
@@ -424,14 +439,15 @@ const DashboardPage = () => {
     try {
       setError("");
       setIsLoading(true);
-      const [dashRes, reportRes] = await Promise.all([
-        api.get("/health/dashboard"),
-        api.get("/reports"),
-      ]);
-      const dashboardData = dashRes.data;
-      const reportData = reportRes.data;
+      const uid = offlineUserId || user?._id || user?.id;
+      const { dashboard: dashboardData, reports: reportData, offline } =
+        await loadDashboardData(uid);
+
       setDashboard(dashboardData);
       setReports(reportData);
+      if (offline) {
+        setPredictionNotice("Showing cached / offline data — will sync when online.");
+      }
 
       const recordCount = dashboardData?.records?.length || 0;
       const tracking = normalizeTrackingRecords(dashboardData?.records || [], recordCount || 1);
@@ -446,11 +462,13 @@ const DashboardPage = () => {
       if (latestRecord) {
         console.log(
           "[Dashboard] latestRecord",
-          latestRecord._id,
+          latestRecord._id || latestRecord.localId,
           "riskScore",
           latestRecord?.computed?.riskScore,
           "source",
-          latestRecord?.computed?.riskSource
+          latestRecord?.computed?.riskSource,
+          "offline",
+          !!offline
         );
       }
     } catch (err) {
@@ -485,15 +503,18 @@ const DashboardPage = () => {
   const latestComputed = latest?.computed;
   const previous = dashboard.records[dashboard.records.length - 2];
   const criticalPhaseDetected = detectCriticalPhase(latest, previous);
-  const isLabCritical = shouldShowLabCritical(resolvedAssessment);
-
   const handleSymptomSubmit = async (payload) => {
     setPredictionError("");
     setPredictionNotice("");
     setPredictionLoading(true);
 
     try {
-      const { data: record } = await api.post("/health/records", payload);
+      const uid = offlineUserId || user?._id || user?.id;
+      const previous = dashboard.records[dashboard.records.length - 1];
+      const { record, offline } = await submitSymptomRecord(payload, {
+        userId: uid,
+        previousRecord: previous,
+      });
       const computed = record?.computed;
 
       if (computed) {
@@ -502,27 +523,34 @@ const DashboardPage = () => {
       }
 
       setLatestRecord(record);
+      setLastSubmissionOffline(offline);
 
-      if (computed?.riskSource === "fallback") {
+      if (offline) {
+        setPredictionNotice(
+          "Offline mode active — record saved locally. WHO-aligned lite risk estimate applied."
+        );
+      } else if (computed?.riskSource === "fallback") {
         setPredictionNotice("ML service unavailable. Saved record with baseline risk.");
       }
 
       console.log(
         "[Dashboard] savedRecord",
-        record?._id,
+        record?._id || record?.localId,
         "riskScore",
         computed?.riskScore,
         "source",
-        computed?.riskSource
+        computed?.riskSource,
+        "offline",
+        offline
       );
 
       await load();
 
       try {
-        const reportResponse = await api.post("/reports", { nearestHospitals: hospitals });
-        if (reportResponse?.data) {
-          setLatestReport(reportResponse.data);
-        }
+        const { report } = await generateReport(hospitals, {
+          recordLocalId: record?.localId,
+        });
+        if (report) setLatestReport(report);
         await load();
       } catch (reportError) {
         console.error("Failed to auto-generate report", reportError);
@@ -708,11 +736,56 @@ const DashboardPage = () => {
   };
 
   const findHospitals = () => {
-    navigator.geolocation.getCurrentPosition(async (position) => {
-      const { latitude, longitude } = position.coords;
-      const { data } = await api.get(`/hospitals/nearby?lat=${latitude}&lng=${longitude}`);
-      setHospitals(data.hospitals);
-    });
+    setHospitalSearchLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          if (isNetworkOnline()) {
+            try {
+              const { data } = await api.get(
+                `/hospitals/nearby?lat=${latitude}&lng=${longitude}`
+              );
+              setHospitals(data.hospitals);
+              return;
+            } catch {
+              // fall through to offline directory
+            }
+          }
+          setHospitals(getOfflineNearbyHospitals(latitude, longitude));
+        } finally {
+          setHospitalSearchLoading(false);
+        }
+      },
+      () => {
+        setHospitals(getOfflineNearbyHospitals(null, null, 5));
+        setHospitalSearchLoading(false);
+      }
+    );
+  };
+
+  const handleDownloadReport = () => {
+    const report = reports[0];
+    if (!report) {
+      setError("No report to download yet. Save symptoms first.");
+      return;
+    }
+    try {
+      const doc = generateMedicalReportPdf({
+        patient: {
+          name: user?.name,
+          email: user?.email,
+          pregnancyStatus: latest?.pregnancyStatus,
+          dayOfIllness: latest?.dayOfIllness,
+        },
+        latestReport: report,
+      });
+      doc.save(
+        `dengueshield-report-${String(user?.email || "patient").replace(/[^a-z0-9]+/gi, "-")}.pdf`
+      );
+    } catch (e) {
+      setError("Could not generate PDF.");
+    }
   };
 
   const cardClass = "rounded-2xl border border-white/10 bg-[#1e293b] p-6 shadow-md";
@@ -723,25 +796,8 @@ const DashboardPage = () => {
       : normalizeTrackingRecords(dashboard.records, dashboard.records?.length || 0);
   const trackingTitle = `${trackingSource.length} Day${trackingSource.length === 1 ? "" : "s"} Tracking`;
 
-  const assessmentAlerts = Array.isArray(resolvedAssessment?.detectedWarnings) &&
-    resolvedAssessment.detectedWarnings.length > 0
-    ? resolvedAssessment.detectedWarnings
-    : resolvedAssessment?.explainability?.reasons || [];
-
   const warnings = resolvedAssessment?.detectedWarnings || [];
   const actions = resolvedAssessment?.recommendations || [];
-  const emergencyAdvice =
-    resolvedAssessment?.emergencyAdvice ||
-    (displayRiskScore >= 90
-      ? "Immediate clinical evaluation recommended."
-      : "Monitor symptoms, stay hydrated, and seek care if conditions worsen.");
-  const advancedReasoning = {
-    graphReasoning: resolvedAssessment?.graphReasoning,
-    whoGuidance: resolvedAssessment?.whoGuidance,
-    confidence: resolvedAssessment?.aiConfidenceLabel,
-  };
-
-  const severityLabel = resolvedAssessment?.severityLabel || translatedRiskLevel;
 
   const rashResultMessage = rashResult
     ? rashResult.prediction === "DENGUE"
@@ -770,55 +826,18 @@ const DashboardPage = () => {
 
       <div className="mx-auto max-w-7xl p-4 md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-3xl font-semibold text-white">{t("dashboardTitle")}</h1>
-          <div className="flex gap-3">
-            <button
-              className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-              onClick={async () => {
-                try {
-                  setError("");
-                  await api.post("/reports", { nearestHospitals: hospitals });
-                  await load();
-                } catch (err) {
-                  setError(err?.response?.data?.message || "Failed to generate report.");
-                }
-              }}
-            >
-              {t("generateReport")}
-            </button>
-          </div>
+          <h1 className="text-2xl font-semibold text-white md:text-3xl">{t("dashboardTitle")}</h1>
+          <RuralModeToggle />
         </div>
 
-        <div className="mt-6 space-y-4">
-          {isLabCritical && (
-            <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-5 text-red-200 shadow-[0_0_30px_rgba(239,68,68,0.35)]">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-red-300">Laboratory-Enhanced Alert</p>
-                  <h2 className="mt-2 text-xl font-semibold text-white">Urgent clinical evaluation recommended</h2>
-                  <p className="mt-2 text-sm text-red-200">
-                    Laboratory indicators suggest severe dengue risk. Proceed to clinical care promptly.
-                  </p>
-                </div>
-                <div className="text-3xl font-semibold text-white tabular-nums">
-                  {clinicalDisplay?.scoreLine || `${Math.round(displayRiskScore)}/100`}
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button
-                  className="rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600"
-                  onClick={findHospitals}
-                >
-                  Find nearest hospital
-                </button>
-                {hospitals.length > 0 && (
-                  <p className="text-sm text-red-100">
-                    Nearest: {hospitals[0].name} ({hospitals[0].distanceKm} km)
-                  </p>
-                )}
-              </div>
-            </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <OfflineStatusBanner />
+          {(lastSubmissionOffline || resolvedAssessment?.riskMode === "offline-lite") && (
+            <OfflineLiteBadge />
           )}
+        </div>
+
+        <div className="mt-6">
           <RiskSummary
             assessment={resolvedAssessment}
             riskScore={displayRiskScore}
@@ -826,8 +845,17 @@ const DashboardPage = () => {
             translatedRiskLevel={translatedRiskLevel}
             warnings={warnings}
             actions={actions}
-            emergencyAdvice={emergencyAdvice}
-            advancedReasoning={advancedReasoning}
+            onFindHospital={findHospitals}
+            onDownloadReport={reports.length > 0 ? handleDownloadReport : undefined}
+            showGuidance
+          />
+        </div>
+
+        <div className="mt-6">
+          <CompactHospitalSection
+            hospitals={hospitals}
+            onFindNearby={findHospitals}
+            loading={hospitalSearchLoading}
           />
         </div>
 
@@ -864,13 +892,9 @@ const DashboardPage = () => {
                 <p className="text-sm text-gray-300">{predictionNotice}</p>
               )}
               {clinicalDisplay && !predictionLoading && !predictionError && (
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-gray-200 space-y-1">
-                  <p>
-                    Estimated risk: <span className="font-semibold text-white">{clinicalDisplay.scoreLine}</span>
-                  </p>
-                  <p className="text-xs text-slate-400">{clinicalDisplay.clinicalSubtitle}</p>
-                  <p className="text-xs text-cyan-300/90">AI Confidence: {clinicalDisplay.aiConfidenceLabel}</p>
-                </div>
+                <p className="text-sm text-slate-400">
+                  Saved · Risk <span className="font-semibold text-white">{clinicalDisplay.score}/100</span>
+                </p>
               )}
             </div>
           </section>
@@ -1251,35 +1275,6 @@ const DashboardPage = () => {
             </div>
           </section>
 
-          <section className={cardClass}>
-            <h2 className={sectionTitleClass}>{t("nearbyHospitals")}</h2>
-            <button
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-              onClick={findHospitals}
-            >
-              {t("findNearby")}
-            </button>
-            <ul className="mt-2 space-y-1 text-sm text-gray-300">
-              {hospitals.map((h) => (
-                <li key={h.name}>
-                  {h.name} ({h.distanceKm} km) - <a className="text-blue-300 hover:text-blue-200" href={h.mapsUrl} target="_blank" rel="noreferrer">{t("googleMaps")}</a>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {displayRiskScore != null && (
-            <section className={`${cardClass} md:col-span-2`}>
-              <h2 className="text-xl font-semibold text-white">{t("aiRiskExplainability")}</h2>
-              <p className="text-sm text-gray-300">{t("riskScore")}: <strong className="text-white">{Math.round(displayRiskScore)}</strong> / 100</p>
-              <p className="text-sm text-gray-300">{t("riskLevel")}: <strong className="text-white">{translatedRiskLevel}</strong></p>
-              {(latestComputed?.explainability?.reasons || []).length > 0 && (
-                <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-gray-300">
-                  {latestComputed.explainability.reasons.map((reason) => <li key={reason}>{reason}</li>)}
-                </ul>
-              )}
-            </section>
-          )}
         </div>
       </div>
 

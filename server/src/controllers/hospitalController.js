@@ -22,7 +22,9 @@ const getNearbyHospitals = async (req, res) => {
       return {
         ...hospital,
         distanceKm: Number(distance.toFixed(2)),
-        mapsUrl: `https://www.google.com/maps?q=${hospital.lat},${hospital.lng}`,
+        distance: `${Number(distance.toFixed(1))} km`,
+        mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(hospital.name)},${hospital.lat},${hospital.lng}`,
+        directionsUrl: `https://www.google.com/maps/dir/?api=1&destination=${hospital.lat},${hospital.lng}`,
       };
     });
 

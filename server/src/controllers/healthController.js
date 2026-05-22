@@ -73,13 +73,21 @@ const createHealthRecord = async (req, res) => {
     const temperature = Number(payload.temperature) || 0;
     const fluidIntakeLiters = Number(payload.fluidIntakeLiters) || 0;
 
+    const plateletFromPayload =
+      payload.plateletCount ?? payload.labData?.plateletCount ?? payload.labs?.plateletCount;
+    let labData =
+      payload.labData || payload.labs ? { ...(payload.labData || payload.labs) } : null;
+    if (plateletFromPayload != null && plateletFromPayload !== "") {
+      labData = { ...(labData || {}), plateletCount: Number(plateletFromPayload) };
+    }
+
     const current = {
       temperature,
       dayOfIllness,
       symptoms,
       fluidIntakeLiters,
       pregnancyStatus: !!payload.pregnancyStatus,
-      labData: payload.labData || payload.labs || null,
+      labData,
     };
 
     let mlResult = null;
@@ -116,7 +124,7 @@ const createHealthRecord = async (req, res) => {
       symptoms,
       fluidIntakeLiters,
       pregnancyStatus: !!payload.pregnancyStatus,
-      labData: payload.labData || payload.labs || undefined,
+      labData: labData || undefined,
       computed,
     });
 

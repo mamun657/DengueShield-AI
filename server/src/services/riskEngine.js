@@ -59,7 +59,7 @@ const calculateClinicalRisk = ({ current, previous, mlResult, graphSignals }) =>
   
   // Build triggered factors with explanations
   const triggeredFactors = [];
-  whoAssessment.explainableFactors?.forEach(f => {
+  whoAssessment.explainableFactors?.forEach((f) => {
     triggeredFactors.push(f.explanation);
   });
   
@@ -83,6 +83,7 @@ const calculateClinicalRisk = ({ current, previous, mlResult, graphSignals }) =>
     detectedWarnings,
     recommendations: whoAssessment.recommendations || [],
     triggeredFactors,
+    scoreBreakdown: triggeredFactors,
     
     // Metadata
     graphSignals: graphSignals || {},

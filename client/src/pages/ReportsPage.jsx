@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import api from "../api";
+import { loadReportsHistory, loadDashboardData } from "../services/offlineApi";
+import { useOfflineStatus } from "../hooks/useOfflineStatus";
+import OfflineStatusBanner from "../components/offline/OfflineStatusBanner";
 import { useAuth } from "../context/AuthContext";
 import DashboardNavbar from "../components/DashboardNavbar";
 import RiskSummary from "../components/RiskSummary";
@@ -15,6 +18,7 @@ import { formatClinicalRisk, MEDICAL_DISCLAIMER, shouldShowElevatedCare } from "
 const ReportsPage = () => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
+  const { userId: offlineUserId } = useOfflineStatus();
   const {
     latestAssessment,
     latestTracking,
@@ -40,21 +44,19 @@ const ReportsPage = () => {
         // - GET /reports returns "top reports" array (DashboardPage uses it).
         // - GET /reports/history returns full history.
         // - GET /health/dashboard returns health records for trends.
-        const [reportsRes, historyRes, dashboardRes] = await Promise.all([
-          api.get("/reports"),
-          api.get("/reports/history"),
-          api.get("/health/dashboard"),
-        ]);
+        const uid = offlineUserId || user?._id || user?.id;
+        const { reports, history, offline } = await loadReportsHistory();
+        const { dashboard: dashboardData } = await loadDashboardData(uid);
 
-        const reports = Array.isArray(reportsRes?.data) ? reportsRes.data : [];
         setLatestReport(reports[0] || null);
-        setHistory(Array.isArray(historyRes?.data) ? historyRes.data : []);
+        setHistory(history);
+        if (offline) setError("");
 
-        const records = Array.isArray(dashboardRes?.data?.records) ? dashboardRes.data.records : [];
+        const records = Array.isArray(dashboardData?.records) ? dashboardData.records : [];
         const latest = records[records.length - 1] || null;
         setLatestRecord(latest);
         const assessment =
-          dashboardRes?.data?.latestAssessment || latest?.computed || null;
+          dashboardData?.latestAssessment || latest?.computed || null;
         setLatestAssessment(assessment);
         setLatestTracking(normalizeTrackingRecords(records, records.length || 1));
       } catch (e) {
@@ -139,10 +141,8 @@ const ReportsPage = () => {
       <div className="mx-auto max-w-7xl p-4 md:p-6">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-semibold text-white">{t("reportsTitle", { defaultValue: "AI Medical Reports" })}</h1>
-            <p className="text-sm text-gray-300 mt-1">
-              {t("reportsSubtitle", { defaultValue: "Personalized clinical risk summary and downloadable PDF" })}
-            </p>
+            <h1 className="text-2xl font-semibold text-white md:text-3xl">{t("reportsTitle", { defaultValue: "Your health report" })}</h1>
+            <p className="text-sm text-slate-400 mt-1">Risk · actions · download PDF</p>
           </div>
 
           <div className="flex items-center gap-3 mt-2 md:mt-0">
@@ -150,6 +150,10 @@ const ReportsPage = () => {
               {t("patient", { defaultValue: "Patient" })}: <span className="text-white/90">{resolvedPatient.name}</span>
             </div>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <OfflineStatusBanner />
         </div>
 
         {error && (
@@ -164,65 +168,64 @@ const ReportsPage = () => {
           </div>
         )}
 
-        <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="rounded-[28px] border border-white/10 bg-[#111827]/95 p-6 shadow-[0_30px_60px_rgba(15,23,42,0.25)]">
-            <RiskSummary
-              assessment={{
-                riskScore,
-                riskLevel,
-                severityLabel: resolvedLatestReport?.severityLabel || riskLevel,
-                displayTitle: resolvedLatestReport?.displayTitle,
-                aiConfidenceLabel: resolvedLatestReport?.aiConfidenceLabel,
-                labPending: resolvedLatestReport?.labPending,
-                clinicalSubtitle: resolvedLatestReport?.clinicalSubtitle,
-                triggeredFactors: resolvedLatestReport?.triggeredFactors,
-                recommendations: resolvedLatestReport?.recommendations,
-                medicalDisclaimer: resolvedLatestReport?.medicalDisclaimer || MEDICAL_DISCLAIMER,
-              }}
-              riskScore={riskScore}
-              riskLevel={riskLevel}
-              translatedRiskLevel={resolvedLatestReport?.severityLabel || riskLevel}
-              warnings={warnings}
-              actions={actions}
-              emergencyAdvice={emergencyAdvice}
-              advancedReasoning={advancedReasoning}
-            />
-          </section>
+        <div className="mt-6 space-y-6">
+          <RiskSummary
+            assessment={{
+              riskScore,
+              riskLevel,
+              severityLabel: resolvedLatestReport?.severityLabel || riskLevel,
+              recommendations: resolvedLatestReport?.recommendations,
+            }}
+            riskScore={riskScore}
+            riskLevel={riskLevel}
+            translatedRiskLevel={resolvedLatestReport?.severityLabel || riskLevel}
+            warnings={warnings}
+            actions={actions}
+            showGuidance
+          />
 
-          <section className="rounded-[28px] border border-white/10 bg-[#111827]/95 p-6 shadow-[0_30px_60px_rgba(15,23,42,0.12)]">
-            <div className="flex items-center justify-between gap-4">
+          <section className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl font-semibold text-white">{t("reportOverview", { defaultValue: "Report overview" })}</h2>
-                <p className="text-sm text-slate-400 mt-1">{t("latestReport", { defaultValue: "Latest AI medical report" })}</p>
+                <h2 className="text-lg font-semibold text-white">Report file</h2>
+                {(resolvedLatestReport?.offlineAvailable || resolvedLatestReport?.offlineGenerated) && (
+                  <span className="mt-1 inline-flex rounded-full border border-teal-500/40 bg-teal-950/50 px-2 py-0.5 text-[10px] font-medium text-teal-200">
+                    Available offline
+                  </span>
+                )}
               </div>
-              <div className="text-xs text-slate-500">
-                {resolvedLatestReport?.createdAt ? new Date(resolvedLatestReport.createdAt).toLocaleDateString() : ""}
-              </div>
+              <p className="text-sm text-slate-400">
+                {resolvedLatestReport?.createdAt
+                  ? new Date(resolvedLatestReport.createdAt).toLocaleDateString()
+                  : ""}
+              </p>
             </div>
-
-            <div className="mt-5 space-y-4 text-sm text-slate-300">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="font-medium text-slate-100">{t("reportSummary", { defaultValue: "Report summary" })}</p>
-                <p className="mt-2 leading-7 text-slate-300">
-                  {snapshot?.clinicalSummary || resolvedLatestReport?.summary || "A concise clinical overview is not available."}
-                </p>
+            {resolvedLatestReport && (
+              <div className="mt-4">
+                <MedicalReportDownload
+                  report={resolvedLatestReport}
+                  patient={resolvedPatient}
+                />
               </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="font-medium text-slate-100">{t("recommendedCare", { defaultValue: "Recommended care" })}</p>
-                <p className="mt-2 leading-7 text-slate-300">
-                  {emergencyAdvice}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <MedicalReportDownload latestReport={resolvedLatestReport} />
-              </div>
-            </div>
+            )}
           </section>
+
+          {history.length > 1 && (
+          <section className="rounded-2xl border border-white/10 bg-slate-900/50 p-5">
+            <h2 className="text-lg font-semibold text-white">Past reports</h2>
+            <ul className="clinical-text mt-3 space-y-2 text-sm text-slate-300">
+              {history.slice(1, 6).map((r) => (
+                <li key={r._id || r.localId} className="flex justify-between border-b border-white/5 py-2">
+                  <span>{new Date(r.createdAt).toLocaleDateString()}</span>
+                  <span className="font-medium text-white">{r.riskScore}/100</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+          )}
         </div>
 
-        <section className="mt-6 rounded-[28px] border border-white/10 bg-[#111827]/95 p-6 shadow-[0_30px_60px_rgba(15,23,42,0.15)]">
+        <section className="mt-6 rounded-2xl border border-white/10 bg-slate-900/50 p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold text-white">{t("trendTitle", {
@@ -265,57 +268,6 @@ const ReportsPage = () => {
             </div>
           </section>
 
-        {history.length > 1 && (
-          <section className="mt-6 rounded-2xl border border-white/10 bg-[#1e293b] p-6 shadow-md">
-            <h2 className="text-xl font-semibold text-white">Report history</h2>
-            <p className="mt-1 text-sm text-slate-400">Immutable snapshots — scores never change retroactively.</p>
-            <div className="mt-4 space-y-3">
-              {history.map((report) => {
-                logPreviousReportRender(report);
-                return (
-                  <div
-                    key={report._id}
-                    className="rounded-xl border border-white/10 bg-black/20 p-4"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm text-white">
-                        {new Date(report.createdAt).toLocaleString()} — Day {report.dayOfIllness ?? "—"}
-                      </p>
-                      <p className="text-sm font-semibold text-cyan-200">
-                        {Math.round(report.riskScore ?? 0)}/100 · {report.riskLevel}
-                      </p>
-                    </div>
-                    <p className="mt-2 text-xs text-slate-400">
-                      Symptoms: {(report.symptoms || []).join(", ") || "None"}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        <section className="mt-6 rounded-2xl border border-white/10 bg-[#1e293b] p-6 shadow-md relative">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-white">{t("downloadTitle", { defaultValue: "Download medical report" })}</h2>
-              <p className="text-sm text-gray-300 mt-1">{t("downloadHint", { defaultValue: "Generate a PDF of this AI report" })}</p>
-            </div>
-
-            <div className="relative z-10">
-              <MedicalReportDownload
-                report={resolvedLatestReport}
-                patient={resolvedPatient}
-                trackingRecords={resolvedTracking}
-                history={history}
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 text-xs text-gray-400">
-            {loading ? "Loading report data..." : ""}
-          </div>
-        </section>
       </div>
     </div>
   );

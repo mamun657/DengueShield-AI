@@ -2,6 +2,8 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react
 import { useTranslation } from "react-i18next";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ClinicalStoreProvider } from "./store/useClinicalStore.jsx";
+import { OfflineProvider } from "./offline/OfflineProvider";
+import OfflineFallbackPage from "./pages/OfflineFallbackPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Footer from "./components/Footer";
 import LoginPage from "./pages/LoginPage";
@@ -108,6 +110,7 @@ const AppLayout = () => {
             }
           />
           <Route path="/family/:token" element={<FamilyViewPage />} />
+          <Route path="/offline" element={<OfflineFallbackPage />} />
         </Routes>
 
       </main>
@@ -118,11 +121,13 @@ const AppLayout = () => {
 
 const App = () => (
   <AuthProvider>
-    <ClinicalStoreProvider>
-      <BrowserRouter>
-        <AppLayout />
-      </BrowserRouter>
-    </ClinicalStoreProvider>
+    <OfflineProvider>
+      <ClinicalStoreProvider>
+        <BrowserRouter>
+          <AppLayout />
+        </BrowserRouter>
+      </ClinicalStoreProvider>
+    </OfflineProvider>
   </AuthProvider>
 );
 
