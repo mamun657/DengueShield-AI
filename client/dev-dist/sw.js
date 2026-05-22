@@ -80,13 +80,13 @@ define(['./workbox-bbbdf4d3'], (function (workbox) { 'use strict';
     "url": "registerSW.js",
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
-    "url": "/offline-fallback.html",
-    "revision": "0.tlrl7plvtg"
+    "url": "index.html",
+    "revision": "0.515me7hl7fc"
   }], {});
   workbox.cleanupOutdatedCaches();
-  workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/offline-fallback.html"), {
+  workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("index.html"), {
     allowlist: [/^\/$/],
-    denylist: [/^\/api\//]
+    denylist: [/^\/api/, /^\/auth/]
   }));
   workbox.registerRoute(({
     request
@@ -98,6 +98,14 @@ define(['./workbox-bbbdf4d3'], (function (workbox) { 'use strict';
       maxAgeSeconds: 604800
     }), new workbox.CacheableResponsePlugin({
       statuses: [0, 200]
+    })]
+  }), 'GET');
+  workbox.registerRoute(/^\/(?:dashboard|reports)(?:\/.*)?$/, new workbox.NetworkFirst({
+    "cacheName": "dashboard-pages",
+    "networkTimeoutSeconds": 5,
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 32,
+      maxAgeSeconds: 2592000
     })]
   }), 'GET');
   workbox.registerRoute(/\/api\/health\//, new workbox.NetworkFirst({
@@ -121,6 +129,13 @@ define(['./workbox-bbbdf4d3'], (function (workbox) { 'use strict';
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 64,
       maxAgeSeconds: 2592000
+    })]
+  }), 'GET');
+  workbox.registerRoute(/\.(?:woff2|woff|ttf|eot)$/, new workbox.CacheFirst({
+    "cacheName": "font-cache",
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 20,
+      maxAgeSeconds: 31536000
     })]
   }), 'GET');
   workbox.registerRoute(/\.(?:js|css)$/, new workbox.StaleWhileRevalidate({

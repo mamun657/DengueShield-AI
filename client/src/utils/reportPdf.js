@@ -440,16 +440,13 @@ export const generateMedicalReportPdf = ({ patient, latestReport }) => {
   pdfText(doc, sections["Risk Estimate"], left + 12, y + 30, { fontSize: 11 });
   y += 50;
 
-  y = addBulletListParagraph(
-    doc,
-    y,
-    left,
-    right,
-    "Key Contributing Factors",
-    latestReport?.triggeredFactors,
-    "Symptom-based factors recorded at assessment.",
-    formatContributingFactor
-  );
+  // Patient-facing reports should not include developer scoring breakdowns.
+  // Replace the internal "Key Contributing Factors" box with a short, clear sentence.
+  y = ensureSpace(doc, y, 36);
+  resetPdfTypography(doc, { bold: false, fontSize: 10 });
+  doc.setTextColor(51, 65, 85);
+  pdfText(doc, "Risk estimated using WHO-aligned symptom analysis.", left + 12, y + 12, { fontSize: 10 });
+  y += 28;
 
   y = drawSectionHeader(doc, y, "3. CLINICAL RECOMMENDATIONS", left, right, headerColor);
 

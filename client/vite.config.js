@@ -39,8 +39,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,json}"],
-        navigateFallback: "/offline-fallback.html",
-        navigateFallbackDenylist: [/^\/api\//],
+        // Do NOT set a global navigateFallback. Instead rely on a NetworkFirst
+        // runtime route for navigations which will only fallback when both
+        // network and cache miss.
+        navigateFallbackDenylist: [/^\/api/, /^\/auth/],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.mode === "navigate",
@@ -50,6 +52,16 @@ export default defineConfig({
               networkTimeoutSeconds: 5,
               expiration: { maxEntries: 32, maxAgeSeconds: 60 * 60 * 24 * 7 },
               cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          // Dashboard and reports pages (prefer network, fallback to cache)
+          {
+            urlPattern: /^\/(?:dashboard|reports)(?:\/.*)?$/,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "dashboard-pages",
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 32, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
           {
@@ -79,6 +91,14 @@ export default defineConfig({
             },
           },
           {
+            urlPattern: /\.(?:woff2|woff|ttf|eot)$/, 
+            handler: "CacheFirst",
+            options: {
+              cacheName: "font-cache",
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
+          {
             urlPattern: /\.(?:js|css)$/,
             handler: "StaleWhileRevalidate",
             options: {
@@ -90,7 +110,6 @@ export default defineConfig({
       },
       devOptions: {
         enabled: true,
-        navigateFallback: "/offline-fallback.html",
       },
     }),
   ],
