@@ -26,20 +26,28 @@ if (process.env.CLIENT_URL) {
 }
 
 const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error("Not allowed by CORS"));
-  },
+  origin: allowedOrigins,
   credentials: true,
 };
+
+console.log("[CORS] Allowed origins:", allowedOrigins);
+console.log("[ENV] CLIENT_URL:", process.env.CLIENT_URL || "<not set>");
 
 app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 app.use(morgan("dev"));
+
+app.use((req, _res, next) => {
+  console.log("[REQUEST]", {
+    method: req.method,
+    url: req.originalUrl,
+    path: req.path,
+    origin: req.headers.origin,
+    host: req.headers.host,
+  });
+  next();
+});
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -48,6 +56,7 @@ app.use(
 );
 
 app.get("/api/healthz", (_req, res) => res.json({ status: "ok" }));
+app.get("/api/test-ai", (_req, res) => res.json({ success: true, message: "AI route works" }));
 app.post("/api/chat", askMedicalQuestion);
 app.post("/api/smart-doctor", askMedicalQuestion);
 app.use("/api/auth", authRoutes);

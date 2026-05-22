@@ -34,13 +34,25 @@ const buildLocalChatReply = (message) => {
 // @access  Public
 const askMedicalQuestion = async (req, res) => {
   try {
+    console.log("CHAT REQUEST RECEIVED", {
+      path: req.path,
+      body: req.body,
+      headers: {
+        origin: req.headers.origin,
+        host: req.headers.host,
+        "content-type": req.headers["content-type"],
+      },
+    });
     const { question, message, patient_data } = req.body;
     const text = question || message;
+    console.log("[CHAT ENV] ML_API_URL", process.env.ML_API_URL, "PYTHON_API_URL", process.env.PYTHON_API_URL, "VITE_ML_API_URL", process.env.VITE_ML_API_URL);
     
     if (!text) {
       return res.status(400).json({ success: false, answer: "Question is required" });
     }
 
+    const mlUrl = buildMlUrl("/chat");
+    console.log("CALLING GROQ API", { url: mlUrl, payload: { message: text, patient_data } });
     const response = await axios.post(
       buildMlUrl("/chat"),
       {
@@ -50,6 +62,10 @@ const askMedicalQuestion = async (req, res) => {
       { timeout: 8000 }
     );
 
+    console.log("[GROQ REQUEST SENT]", { requestUrl: buildMlUrl("/chat"), requestPayload: { message: text, patient_data: patient_data || {} } });
+
+    console.log("GROQ RESPONSE SUCCESS", { status: response.status, data: response.data });
+
     // Return structured JSON
     return res.json({
       success: true,
@@ -58,7 +74,7 @@ const askMedicalQuestion = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("[Chatbot Error]:", error.message);
+    console.error("CHAT ERROR:", error.response?.data || error.message || error);
     return res.json({
       success: true,
       answer: buildLocalChatReply(text),
