@@ -9,30 +9,26 @@ const healthRoutes = require("./routes/healthRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const hospitalRoutes = require("./routes/hospitalRoutes");
+const { askMedicalQuestion } = require("./controllers/ragController");
 
 const app = express();
 
-const parseOrigins = (value) =>
-  value
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-
-const defaultOrigins = [
+const allowedOrigins = [
   "http://localhost:5173",
-  "http://127.0.0.1:5173",
   "https://dengueshield-ai.onrender.com",
 ];
-const envOrigins = parseOrigins(process.env.CLIENT_URL || "");
-const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
-const isLocalhostDevOrigin = (origin) =>
-  /^http:\/\/localhost:5\d{3}$/.test(origin || "");
+if (process.env.CLIENT_URL) {
+  const configuredOrigin = process.env.CLIENT_URL.trim();
+  if (configuredOrigin && !allowedOrigins.includes(configuredOrigin)) {
+    allowedOrigins.push(configuredOrigin);
+  }
+}
 
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin) || isLocalhostDevOrigin(origin)) {
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     return callback(new Error("Not allowed by CORS"));
@@ -52,6 +48,8 @@ app.use(
 );
 
 app.get("/api/healthz", (_req, res) => res.json({ status: "ok" }));
+app.post("/api/chat", askMedicalQuestion);
+app.post("/api/smart-doctor", askMedicalQuestion);
 app.use("/api/auth", authRoutes);
 app.use("/api/user", require("./routes/userRoutes"));
 app.use("/api/health", healthRoutes);

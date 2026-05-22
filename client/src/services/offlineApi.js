@@ -18,16 +18,22 @@ export const isNetworkOnline = () =>
 
 export const hasAuthToken = () => !!localStorage.getItem("token");
 
+import { API_BASE_URL } from "../config/apiBase";
+
 export const canReachServer = async () => {
   if (!isNetworkOnline() || !hasAuthToken()) return false;
+
   try {
-    const base = import.meta.env.VITE_API_URL || "http://localhost:5000";
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(`${base}/api/healthz`, { signal: controller.signal });
+    const res = await fetch(`${API_BASE_URL}/healthz`, { signal: controller.signal });
     clearTimeout(timeout);
     return res.ok;
-  } catch {
+  } catch (error) {
+    console.warn("[Offline API] healthz check failed", {
+      error: error?.message,
+      url: `${API_BASE_URL}/healthz`,
+    });
     return false;
   }
 };

@@ -25,6 +25,7 @@ const ChatBox = ({ isOpen, onClose, patientData }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState("");
   const [isEntering, setIsEntering] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const [isListening, setIsListening] = useState(false);
@@ -244,6 +245,7 @@ const ChatBox = ({ isOpen, onClose, patientData }) => {
     // Cancel any active speech synthesis when sending a new message
     window.speechSynthesis?.cancel();
 
+    setSendError("");
     const nextMessages = [...messages, { role: "user", content: text }];
     setMessages(nextMessages);
     setInput("");
@@ -253,12 +255,13 @@ const ChatBox = ({ isOpen, onClose, patientData }) => {
       const data = await sendChatMessage({ message: text, history: nextMessages, patient_data: patientData });
       const reply = String(data?.reply || "").trim() || "Sorry, I could not respond right now.";
       setMessages([...nextMessages, { role: "assistant", content: reply }]);
-    } catch {
-      const fallback = "Sorry, I could not respond right now.";
-      setMessages([
-        ...nextMessages,
-        { role: "assistant", content: fallback },
-      ]);
+      if (data?.warning) {
+        setSendError("Smart Doctor is temporarily unavailable. Please try again in a moment.");
+      }
+    } catch (err) {
+      const fallback = "Could not reach Smart Doctor right now. Please check your connection and try again.";
+      setMessages([...nextMessages, { role: "assistant", content: fallback }]);
+      setSendError(fallback);
     } finally {
       setIsSending(false);
     }
@@ -490,7 +493,12 @@ const ChatBox = ({ isOpen, onClose, patientData }) => {
               </button>
             )}
 
-            <div className="flex items-end gap-2">
+            {sendError && (
+            <p className="mb-2 text-xs font-medium text-rose-200">
+              {sendError}
+            </p>
+          )}
+          <div className="flex items-end gap-2">
               <textarea
                 className="h-12 min-w-0 flex-1 resize-none rounded-xl border border-white/10 bg-[#111c33] px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Type your message..."
