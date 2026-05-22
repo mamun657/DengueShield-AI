@@ -1,9 +1,15 @@
 const severityColor = {
   High: "from-rose-500/20 to-orange-500/10 border-rose-400/40 text-rose-100",
   "High Risk Suspicion": "from-rose-500/20 to-orange-500/10 border-rose-400/40 text-rose-100",
+  "High WHO Warning Risk": "from-orange-500/20 to-yellow-500/10 border-orange-400/40 text-orange-100",
   Moderate: "from-amber-500/15 to-yellow-500/10 border-amber-400/35 text-amber-100",
+  "Moderate Suspicion": "from-amber-500/15 to-yellow-500/10 border-amber-400/35 text-amber-100",
+  Mild: "from-cyan-500/15 to-blue-500/10 border-cyan-400/35 text-cyan-100",
+  "Mild Suspicion": "from-cyan-500/15 to-blue-500/10 border-cyan-400/35 text-cyan-100",
+  "Low Suspicion": "from-emerald-500/15 to-teal-500/10 border-emerald-400/35 text-emerald-100",
   Low: "from-emerald-500/15 to-teal-500/10 border-emerald-400/35 text-emerald-100",
   Critical: "from-rose-500/25 to-red-500/10 border-rose-400/50 text-rose-100",
+  "Critical Severe Dengue Risk": "from-rose-500/25 to-red-500/10 border-rose-400/50 text-rose-100",
   "Severe Dengue Risk": "from-rose-500/25 to-red-500/10 border-rose-400/50 text-rose-100",
 };
 

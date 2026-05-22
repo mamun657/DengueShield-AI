@@ -98,25 +98,21 @@ const ReportsPage = () => {
   const resolvedTracking = Array.isArray(latestTracking) ? latestTracking : [];
 
   const snapshot = getReportSnapshot(resolvedLatestReport);
-  const reportClinical = formatClinicalRisk({
-    riskScore: snapshot?.riskScore,
-    riskLevel: snapshot?.riskLevel,
-    severityLabel: resolvedLatestReport?.severityLabel || snapshot?.riskLevel,
-    displayTitle: resolvedLatestReport?.displayTitle,
-    aiConfidenceLabel: resolvedLatestReport?.aiConfidenceLabel,
-    labPending: resolvedLatestReport?.labPending,
-    clinicalSubtitle: resolvedLatestReport?.clinicalSubtitle,
-    triggeredFactors: resolvedLatestReport?.triggeredFactors,
-    recommendations: resolvedLatestReport?.recommendations,
-    medicalDisclaimer: resolvedLatestReport?.medicalDisclaimer,
-  });
   const riskScore = snapshot?.riskScore ?? null;
-  const riskLevel = snapshot?.riskLevel ?? "LOW";
-  const isElevated = shouldShowElevatedCare({
-    riskScore,
-    riskMode: resolvedLatestReport?.riskMode,
-    labPending: resolvedLatestReport?.labPending,
-  });
+  const riskLevel = snapshot?.riskLevel ?? "Low";
+  const warnings = snapshot?.detectedWarnings || resolvedLatestReport?.detectedWarnings || [];
+  const actions = snapshot?.recommendations || resolvedLatestReport?.recommendations || [];
+  const emergencyAdvice =
+    snapshot?.emergencyAdvice ||
+    resolvedLatestReport?.emergencyAdvice ||
+    (riskScore >= 90
+      ? "Immediate clinical evaluation recommended."
+      : "Monitor symptoms, stay hydrated, and seek care if conditions worsen.");
+  const advancedReasoning = {
+    graphReasoning: resolvedLatestReport?.graphReasoning,
+    whoGuidance: snapshot?.whoGuidance || resolvedLatestReport?.whoGuidance,
+    confidence: resolvedLatestReport?.aiConfidenceLabel,
+  };
 
   useEffect(() => {
     if (!resolvedLatestReport) return;
@@ -156,25 +152,6 @@ const ReportsPage = () => {
           </div>
         </div>
 
-        {isElevated && (
-          <div className="mt-5 rounded-2xl border border-amber-500/35 bg-amber-500/10 p-5 text-amber-100">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-amber-200">Elevated clinical suspicion</p>
-                <h2 className="mt-2 text-xl font-semibold text-white">
-                  {reportClinical?.displayTitle || "Estimated Severe Dengue Risk"}
-                </h2>
-                <p className="mt-2 text-sm text-amber-100">
-                  Based on symptom progression and WHO warning signs. Clinical confirmation recommended.
-                </p>
-              </div>
-              <div className="text-2xl font-semibold tabular-nums text-white">
-                {reportClinical?.scoreLine || `${Math.round(Number(riskScore) || 0)}/100`}
-              </div>
-            </div>
-          </div>
-        )}
-
         {error && (
           <div className="mt-4 rounded-lg border border-red-600/40 bg-red-600/10 p-3 text-sm text-red-300">
             {error}
@@ -187,8 +164,8 @@ const ReportsPage = () => {
           </div>
         )}
 
-        <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
-          <section className="rounded-2xl border border-white/10 bg-[#1e293b] p-6 shadow-md">
+        <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="rounded-[28px] border border-white/10 bg-[#111827]/95 p-6 shadow-[0_30px_60px_rgba(15,23,42,0.25)]">
             <RiskSummary
               assessment={{
                 riskScore,
@@ -205,59 +182,70 @@ const ReportsPage = () => {
               riskScore={riskScore}
               riskLevel={riskLevel}
               translatedRiskLevel={resolvedLatestReport?.severityLabel || riskLevel}
-              alerts={isElevated ? ["Elevated dengue risk suspicion — lab confirmation advised"] : []}
+              warnings={warnings}
+              actions={actions}
+              emergencyAdvice={emergencyAdvice}
+              advancedReasoning={advancedReasoning}
             />
-
-            <div className="mt-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white">{t("aiClinicalSummary", { defaultValue: "AI clinical summary" })}</h2>
-                <div className="text-xs text-gray-400">
-                  {resolvedLatestReport?.createdAt ? new Date(resolvedLatestReport.createdAt).toLocaleDateString() : ""}
-                </div>
-              </div>
-
-              <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-4">
-                <p className="text-sm text-gray-200">
-                  {snapshot?.clinicalSummary ||
-                    resolvedLatestReport?.summary ||
-                    resolvedLatestReport?.reportText ||
-                    "Clinical summary unavailable."}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4">
-              <p className="text-xs uppercase tracking-wider text-slate-400">{t("whoGuidance", { defaultValue: "WHO guidance" })}</p>
-              <p className="mt-2 text-sm text-slate-200">
-                {(snapshot?.whoGuidance ||
-                  resolvedLatestReport?.whoGuidance ||
-                  "Maintain hydration, monitor symptoms, and seek clinical care if worsening.")}
-              </p>
-            </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-[#1e293b] p-6 shadow-md">
-            <h2 className="text-xl font-semibold text-white">
-              {t("trendTitle", {
-                defaultValue: `${resolvedTracking.length} day${resolvedTracking.length === 1 ? "" : "s"} trend`,
-              })}
-            </h2>
-            <p className="text-sm text-gray-300 mt-1">{t("trendSubtitle", { defaultValue: "Temperature & risk progression" })}</p>
-            <div className="mt-4">
-              {resolvedTracking.length > 0 ? (
-                <TrendChart records={resolvedTracking} />
-              ) : (
-                <div className="rounded-xl border border-dashed border-white/10 bg-black/20 p-6 text-center text-sm text-slate-400">
-                  No tracking history yet. Save daily records to build a real trend line.
-                </div>
-              )}
+          <section className="rounded-[28px] border border-white/10 bg-[#111827]/95 p-6 shadow-[0_30px_60px_rgba(15,23,42,0.12)]">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-white">{t("reportOverview", { defaultValue: "Report overview" })}</h2>
+                <p className="text-sm text-slate-400 mt-1">{t("latestReport", { defaultValue: "Latest AI medical report" })}</p>
+              </div>
+              <div className="text-xs text-slate-500">
+                {resolvedLatestReport?.createdAt ? new Date(resolvedLatestReport.createdAt).toLocaleDateString() : ""}
+              </div>
             </div>
 
-            <div className="mt-6">
-              <h2 className="text-lg font-semibold text-white">{t("symptomTimeline", { defaultValue: "Symptom timeline" })}</h2>
-              <div className="mt-3 space-y-2">
-                {resolvedTracking.length > 0 ? (
-                  resolvedTracking.slice(-3).map((r, idx) => (
+            <div className="mt-5 space-y-4 text-sm text-slate-300">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="font-medium text-slate-100">{t("reportSummary", { defaultValue: "Report summary" })}</p>
+                <p className="mt-2 leading-7 text-slate-300">
+                  {snapshot?.clinicalSummary || resolvedLatestReport?.summary || "A concise clinical overview is not available."}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="font-medium text-slate-100">{t("recommendedCare", { defaultValue: "Recommended care" })}</p>
+                <p className="mt-2 leading-7 text-slate-300">
+                  {emergencyAdvice}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <MedicalReportDownload latestReport={resolvedLatestReport} />
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section className="mt-6 rounded-[28px] border border-white/10 bg-[#111827]/95 p-6 shadow-[0_30px_60px_rgba(15,23,42,0.15)]">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-white">{t("trendTitle", {
+                defaultValue: `${resolvedTracking.length} day${resolvedTracking.length === 1 ? "" : "s"} trend`,
+              })}</h2>
+              <p className="text-sm text-slate-400 mt-1">{t("trendSubtitle", { defaultValue: "Temperature & risk progression" })}</p>
+            </div>
+          </div>
+          <div className="mt-4">
+            {resolvedTracking.length > 0 ? (
+              <TrendChart records={resolvedTracking} />
+            ) : (
+              <div className="rounded-xl border border-dashed border-white/10 bg-black/20 p-6 text-center text-sm text-slate-400">
+                No tracking history yet. Save daily records to build a real trend line.
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6">
+            <h2 className="text-lg font-semibold text-white">{t("symptomTimeline", { defaultValue: "Symptom timeline" })}</h2>
+            <div className="mt-3 space-y-2">
+              {resolvedTracking.length > 0 ? (
+                resolvedTracking.slice(-3).map((r, idx) => (
                     <div key={idx} className="rounded-lg border border-white/10 bg-black/20 p-3">
                       <p className="text-xs text-slate-400">
                         {r?.dayOfIllness || r?.day || idx + 1 ? `Day ${r.dayOfIllness || r.day || idx + 1}` : "Day"}
@@ -276,7 +264,6 @@ const ReportsPage = () => {
               </div>
             </div>
           </section>
-        </div>
 
         {history.length > 1 && (
           <section className="mt-6 rounded-2xl border border-white/10 bg-[#1e293b] p-6 shadow-md">

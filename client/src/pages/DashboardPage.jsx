@@ -58,15 +58,15 @@ const extractReportSections = (report) => {
     "AI Risk Score": Number.isFinite(report?.riskScore)
       ? `${report.riskScore}/100 (${report.riskLevel})`
       : "Not available",
-    "Recommended Action": "Continue hydration, monitor temperature, and recheck symptoms every 12-24 hours.",
+    "Recommended Action": "Maintain hydration, daily symptom monitoring, and clinical care if warning signs develop.",
     "WHO Guidance":
       report?.whoGuidance ||
-      "Maintain hydration, monitor platelet count, and seek immediate clinical care if bleeding or abdominal pain develops.",
-    "WHO Guidance (Bangla)": "WHO নির্দেশনা: পর্যাপ্ত পানি পান করুন এবং রক্তক্ষরণ বা পেটব্যথা দেখা দিলে দ্রুত হাসপাতালে যোগাযোগ করুন।",
+      "Continue hydration and rest. Seek immediate hospital care if warning signs appear: persistent vomiting, abdominal pain, bleeding, or drowsiness.",
+    "WHO Guidance (Bangla)": "ক্রমাগত হাইড্রেশন বজায় রাখুন। জরুরি লক্ষণ দেখা দিলে হাসপাতালে যান: ক্রমাগত বমি, পেটে ব্যথা, রক্তক্ষরণ বা তন্দ্রা।",
     "Emergency Advice":
       report?.emergencyAdvice ||
-      "Seek urgent care for persistent vomiting, bleeding, severe abdominal pain, or drowsiness.",
-    "Disclaimer": "This AI-generated report is informational and does not replace a licensed physician.",
+      "Seek urgent hospital care if: persistent vomiting, severe abdominal pain, bleeding, lethargy, or severe weakness develops.",
+    "Disclaimer": "This AI system estimates dengue risk and does not diagnose. Symptoms may overlap with COVID-19, influenza, malaria, typhoid, and other febrile illnesses.",
   };
 
   lines.forEach((line) => {
@@ -91,7 +91,7 @@ const extractReportSections = (report) => {
   if (report?.riskScore >= 61) {
     ordered.push({
       title: "Emergency Advice (Bangla)",
-      content: "রোগীর অবস্থা বর্তমানে ঝুঁকিপূর্ণ। তাৎক্ষণিক হাসপাতালে যোগাযোগ করুন।",
+      content: "এখনই হাসপাতালে যান। জরুরি লক্ষণ দেখা দিলে দ্রুত চিকিৎসা প্রয়োজন।",
     });
   }
 
@@ -486,7 +486,6 @@ const DashboardPage = () => {
   const previous = dashboard.records[dashboard.records.length - 2];
   const criticalPhaseDetected = detectCriticalPhase(latest, previous);
   const isLabCritical = shouldShowLabCritical(resolvedAssessment);
-  const isElevatedConcern = shouldShowElevatedCare(resolvedAssessment) && !isLabCritical;
 
   const handleSymptomSubmit = async (payload) => {
     setPredictionError("");
@@ -729,23 +728,20 @@ const DashboardPage = () => {
     ? resolvedAssessment.detectedWarnings
     : resolvedAssessment?.explainability?.reasons || [];
 
+  const warnings = resolvedAssessment?.detectedWarnings || [];
+  const actions = resolvedAssessment?.recommendations || [];
+  const emergencyAdvice =
+    resolvedAssessment?.emergencyAdvice ||
+    (displayRiskScore >= 90
+      ? "Immediate clinical evaluation recommended."
+      : "Monitor symptoms, stay hydrated, and seek care if conditions worsen.");
+  const advancedReasoning = {
+    graphReasoning: resolvedAssessment?.graphReasoning,
+    whoGuidance: resolvedAssessment?.whoGuidance,
+    confidence: resolvedAssessment?.aiConfidenceLabel,
+  };
+
   const severityLabel = resolvedAssessment?.severityLabel || translatedRiskLevel;
-  const alertMessages = [
-    ...assessmentAlerts,
-    ...(resolvedAssessment?.recommendations || []),
-    severityLabel === "Severe Dengue Risk" || severityLabel === "Critical"
-      ? "Urgent clinical evaluation recommended (lab-enhanced assessment)"
-      : null,
-    severityLabel === "High Risk Suspicion"
-      ? "Elevated dengue risk suspicion — clinical confirmation recommended"
-      : null,
-    latest?.temperature >= 38.5 ? t("alertHighFever") : null,
-    (latest?.symptoms || []).includes("bleeding") ? t("alertBleeding") : null,
-    latest?.dayOfIllness >= 3 && latest?.dayOfIllness <= 7 ? t("alertPlateletRisk") : null,
-    criticalPhaseDetected ? "Possible transition toward dengue critical phase detected" : null,
-    resolvedAssessment?.labPending ? "CBC / Platelet test advised" : null,
-  ].filter(Boolean);
-  const uniqueAlerts = Array.from(new Set(alertMessages));
 
   const rashResultMessage = rashResult
     ? rashResult.prediction === "DENGUE"
@@ -823,25 +819,15 @@ const DashboardPage = () => {
               </div>
             </div>
           )}
-          {isElevatedConcern && (
-            <div className="rounded-2xl border border-amber-500/35 bg-amber-500/10 p-5 text-amber-100">
-              <p className="text-xs uppercase tracking-[0.2em] text-amber-200">Elevated clinical suspicion</p>
-              <h2 className="mt-2 text-lg font-semibold text-white">
-                {clinicalDisplay?.displayTitle || "High Risk Suspicion"}
-              </h2>
-              <p className="mt-2 text-sm text-amber-100">
-                Your symptoms may indicate elevated dengue risk based on WHO warning patterns. Clinical confirmation and
-                CBC/platelet testing are recommended.
-              </p>
-              <p className="mt-2 text-2xl font-bold text-white tabular-nums">{clinicalDisplay?.scoreLine}</p>
-            </div>
-          )}
           <RiskSummary
             assessment={resolvedAssessment}
             riskScore={displayRiskScore}
             riskLevel={translatedRiskLevel}
             translatedRiskLevel={translatedRiskLevel}
-            alerts={uniqueAlerts}
+            warnings={warnings}
+            actions={actions}
+            emergencyAdvice={emergencyAdvice}
+            advancedReasoning={advancedReasoning}
           />
         </div>
 

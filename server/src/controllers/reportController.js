@@ -294,6 +294,24 @@ const buildReportSnapshot = ({
 
     })),
 
+    snapshotData: {
+      riskScore: assessment.riskScore,
+      riskLevel: assessment.riskLevel,
+      severityLabel: assessment.severityLabel,
+      displayTitle: assessment.displayTitle,
+      triggeredFactors: assessment.triggeredFactors || [],
+      recommendations: assessment.recommendations || [],
+      clinicalSubtitle: assessment.clinicalSubtitle,
+      medicalDisclaimer: assessment.medicalDisclaimer || MEDICAL_DISCLAIMER,
+      detectedWarnings,
+      whoGuidance: whoText,
+      emergencyAdvice,
+      aiConfidence: assessment.aiConfidence,
+      aiConfidenceLabel: assessment.aiConfidenceLabel,
+      labPending: assessment.labPending,
+      riskMode: assessment.riskMode,
+    },
+
   };
 
 };
