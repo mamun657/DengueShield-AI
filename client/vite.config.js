@@ -9,9 +9,17 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["dengue-icon.png", "icons.svg", "offline-fallback.html"],
+      includeAssets: [
+        "dengue-icon.png",
+        "icons.svg",
+        "offline-fallback.html",
+        "icons/favicon.ico",
+        "icons/icon-192.png",
+        "icons/icon-512.png",
+        "icons/apple-touch-icon.png",
+      ],
       manifest: {
-        name: "DengueShield AI — Rural Telehealth",
+        name: "DengueShield AI",
         short_name: "DengueShield",
         description:
           "Offline-capable dengue clinical risk estimation and WHO-aligned telehealth for low-connectivity regions.",
@@ -24,16 +32,15 @@ export default defineConfig({
         categories: ["health", "medical"],
         icons: [
           {
-            src: "/favicon.svg",
-            sizes: "any",
-            type: "image/svg+xml",
-            purpose: "any",
+            src: "/icons/icon-192.png",
+            sizes: "192x192",
+            type: "image/png",
           },
           {
-            src: "/favicon.svg",
+            src: "/icons/icon-512.png",
             sizes: "512x512",
-            type: "image/svg+xml",
-            purpose: "maskable",
+            type: "image/png",
+            purpose: "any maskable",
           },
         ],
       },
