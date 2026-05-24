@@ -106,9 +106,6 @@ const DashboardNavbar = ({ userName, userRole, onLogout, onOpenSmartDoctor }) =>
           )}
         </NavLink>
 
-        <button className="rounded-lg px-4 py-2 font-normal text-slate-400 transition-all duration-300 hover:bg-white/5 hover:text-white">{t("alertsTab")}</button>
-        <button className="rounded-lg px-4 py-2 font-normal text-slate-400 transition-all duration-300 hover:bg-white/5 hover:text-white">{t("resourcesTab")}</button>
-        
         <NavLink 
           to="/profile" 
           className={({ isActive }) => 
