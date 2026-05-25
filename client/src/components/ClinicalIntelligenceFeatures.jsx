@@ -60,6 +60,20 @@ const storySections = [
 ];
 
 const ClinicalIntelligenceFeatures = () => {
+  const IntelligenceIcon = () => (
+    <svg
+      className="h-4 w-4"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8v4m-2-2h4" />
+      <path d="M8 6c-1.5 1.5-2 3-2 6s.5 4.5 2 6m8-12c1.5 1.5 2 3 2 6s-.5 4.5-2 6" />
+    </svg>
+  );
+
   return (
     <section id="clinical-intelligence" className="relative overflow-hidden bg-[#071324] px-6 py-24 md:px-10 lg:px-14">
       <style>{`
@@ -108,8 +122,10 @@ const ClinicalIntelligenceFeatures = () => {
           const isTextLeft = section.layout === "text-left";
           const textColumn = (
             <div className="space-y-6">
-              <span className="inline-flex w-fit items-center rounded-full border border-cyan-200/25 bg-cyan-200/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100">
-                Clinical Intelligence
+              <span className="relative inline-flex w-fit items-center rounded-full border border-cyan-200/25 bg-cyan-200/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100">
+                <IntelligenceIcon />
+                <span className="ml-2">Clinical Intelligence</span>
+                <span className="absolute -right-2 -top-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[#071324]" />
               </span>
               <h2 className="text-3xl font-semibold text-white md:text-4xl">{section.title}</h2>
               <p className="text-sm leading-7 text-slate-300 md:text-base">{section.description}</p>
