@@ -1,13 +1,20 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { resolveAvatarUrl } from "../utils/avatarUrl";
 
 const DashboardNavbar = ({ userName, userRole, userPhotoUrl, onLogout, onOpenSmartDoctor }) => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const resolvedName = userName || user?.name;
   const resolvedRole = userRole || user?.role;
-  const resolvedPhotoUrl = userPhotoUrl || user?.photoUrl;
+  const resolvedPhotoUrl = resolveAvatarUrl(userPhotoUrl || user?.photoUrl);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [resolvedPhotoUrl]);
   const isAdmin = String(resolvedRole || "").toLowerCase() === "admin";
   const initials = (resolvedName || "U").trim().charAt(0).toUpperCase();
 
@@ -127,11 +134,16 @@ const DashboardNavbar = ({ userName, userRole, userPhotoUrl, onLogout, onOpenSma
 
       <div className="flex shrink-0 items-center gap-3 text-sm">
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-xs font-semibold text-white overflow-hidden">
-          {resolvedPhotoUrl ? (
+          {resolvedPhotoUrl && !avatarLoadFailed ? (
             <img
               src={resolvedPhotoUrl}
               alt={resolvedName ? `${resolvedName} avatar` : "User avatar"}
               className="h-full w-full object-cover"
+              crossOrigin="anonymous"
+              onError={() => {
+                console.error("[Avatar] navbar image failed to load:", resolvedPhotoUrl);
+                setAvatarLoadFailed(true);
+              }}
             />
           ) : (
             initials

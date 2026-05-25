@@ -11,16 +11,9 @@ const requireEnv = (key) => {
   return value;
 };
 
-const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
+const { resolvePhotoUrl } = require("../utils/photoUrl");
 
-const resolvePhotoUrl = (req, photoUrl) => {
-  if (!photoUrl) return "";
-  if (/^https?:\/\//i.test(photoUrl)) return photoUrl;
-  if (photoUrl.startsWith("/")) {
-    return `${req.protocol}://${req.get("host")}${photoUrl}`;
-  }
-  return photoUrl;
-};
+const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
 
 const signToken = (id, role) =>
   jwt.sign({ id, role }, requireEnv("JWT_SECRET"), { expiresIn: "7d" });
@@ -42,6 +35,11 @@ const register = async (req, res) => {
       password,
       role: role || "user",
     });
+    const resolvedPhotoUrl = resolvePhotoUrl(req, user.photoUrl);
+    console.log("[Profile Photo] register", {
+      stored: user.photoUrl,
+      resolved: resolvedPhotoUrl,
+    });
     return res.status(201).json({
       token: signToken(user._id, user.role),
       user: {
@@ -49,7 +47,7 @@ const register = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        photoUrl: resolvePhotoUrl(req, user.photoUrl),
+        photoUrl: resolvedPhotoUrl,
       },
     });
   } catch (error) {
@@ -76,6 +74,11 @@ const login = async (req, res) => {
     const match = await user.comparePassword(password);
     if (!match) return res.status(401).json({ message: "Invalid credentials" });
 
+    const resolvedPhotoUrl = resolvePhotoUrl(req, user.photoUrl);
+    console.log("[Profile Photo] login", {
+      stored: user.photoUrl,
+      resolved: resolvedPhotoUrl,
+    });
     return res.json({
       token: signToken(user._id, user.role),
       user: {
@@ -83,7 +86,7 @@ const login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        photoUrl: resolvePhotoUrl(req, user.photoUrl),
+        photoUrl: resolvedPhotoUrl,
       },
     });
   } catch (error) {
@@ -93,7 +96,9 @@ const login = async (req, res) => {
 };
 
 const profile = async (req, res) => {
-  return res.json(req.user);
+  const payload = req.user.toObject ? req.user.toObject() : { ...req.user };
+  payload.photoUrl = resolvePhotoUrl(req, payload.photoUrl);
+  return res.json(payload);
 };
 
 module.exports = { register, login, profile };

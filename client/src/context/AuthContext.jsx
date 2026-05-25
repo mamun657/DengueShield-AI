@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo, useState } from "react";
+import { resolveAvatarUrl } from "../utils/avatarUrl";
 
 const AuthContext = createContext(null);
 
@@ -32,13 +33,18 @@ export const AuthProvider = ({ children }) => {
     if (!parsedUser) return null;
 
     const resolvedRole = normalizeRole(parsedUser.role || readRoleFromToken());
-    return resolvedRole ? { ...parsedUser, role: resolvedRole } : parsedUser;
+    const withRole = resolvedRole ? { ...parsedUser, role: resolvedRole } : parsedUser;
+    return {
+      ...withRole,
+      photoUrl: resolveAvatarUrl(withRole.photoUrl),
+    };
   });
 
   const login = ({ token, user: userData }) => {
     const normalizedUser = {
       ...userData,
       role: String(userData?.role || "").toLowerCase(),
+      photoUrl: resolveAvatarUrl(userData?.photoUrl),
     };
 
     localStorage.setItem("token", token);
@@ -57,6 +63,9 @@ export const AuthProvider = ({ children }) => {
     setUser((prev) => {
       const merged = { ...(prev || {}), ...updates };
       if (merged.role) merged.role = String(merged.role).toLowerCase();
+      if ("photoUrl" in updates) {
+        merged.photoUrl = resolveAvatarUrl(merged.photoUrl);
+      }
       localStorage.setItem("user", JSON.stringify(merged));
       return merged;
     });

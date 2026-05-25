@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import DashboardNavbar from "../components/DashboardNavbar";
 import api from "../api";
 import useOfflineStatus from "../hooks/useOfflineStatus";
+import { resolveAvatarUrl } from "../utils/avatarUrl";
 
 const ProfilePage = () => {
   const { t } = useTranslation();
@@ -22,6 +23,7 @@ const ProfilePage = () => {
   const [editForm, setEditForm] = useState({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   useEffect(() => {
     fetchProfileData();
@@ -37,8 +39,17 @@ const ProfilePage = () => {
         api.get("/user/reports")
       ]);
       
-      setProfile(profileRes.data);
-      updateUser(profileRes.data);
+      const profileData = {
+        ...profileRes.data,
+        photoUrl: resolveAvatarUrl(profileRes.data?.photoUrl),
+      };
+      console.log("[Avatar] profile loaded", {
+        stored: profileRes.data?.photoUrl,
+        display: profileData.photoUrl,
+      });
+      setProfile(profileData);
+      updateUser(profileData);
+      setAvatarLoadFailed(false);
       setEditForm({
         name: profileRes.data.name || "",
         age: profileRes.data.age || "",
@@ -82,8 +93,18 @@ const ProfilePage = () => {
               if (evt.total) setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
             }
           });
-          setProfile(uploadRes.data);
-          updateUser(uploadRes.data);
+          const uploadedProfile = {
+            ...(profile || {}),
+            ...uploadRes.data,
+            photoUrl: resolveAvatarUrl(uploadRes.data?.photoUrl),
+          };
+          console.log("[Avatar] upload complete", {
+            stored: uploadRes.data?.photoUrl,
+            display: uploadedProfile.photoUrl,
+          });
+          setProfile(uploadedProfile);
+          updateUser(uploadedProfile);
+          setAvatarLoadFailed(false);
           setPhotoFile(null);
           setPhotoPreview(null);
           setUploadProgress(0);
@@ -108,6 +129,9 @@ const ProfilePage = () => {
   };
 
   const initials = (profile?.name || user?.name || "U").trim().charAt(0).toUpperCase();
+  const avatarDisplayUrl = photoPreview
+    ? photoPreview
+    : resolveAvatarUrl(profile?.photoUrl || user?.photoUrl);
   const { isOnline, syncStatus, lastSyncMessage } = useOfflineStatus();
 
   const latestRiskScore = reports.length > 0 ? reports[0].reportData?.riskScore || 0 : 0;
@@ -187,10 +211,17 @@ const ProfilePage = () => {
                 <div className="relative">
                   <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-cyan-400/70 to-indigo-600/60 shadow-[0_10px_30px_rgba(6,12,30,0.6)]">
                     <div className="w-full h-full rounded-full bg-[#061025] flex items-center justify-center overflow-hidden border-[3px] border-[#071226]">
-                      {photoPreview ? (
-                        <img src={photoPreview} alt="avatar" className="w-full h-full object-cover" />
-                      ) : profile?.photoUrl ? (
-                        <img src={profile.photoUrl} alt="avatar" className="w-full h-full object-cover" />
+                      {avatarDisplayUrl && !avatarLoadFailed ? (
+                        <img
+                          src={avatarDisplayUrl}
+                          alt="avatar"
+                          className="w-full h-full object-cover"
+                          crossOrigin="anonymous"
+                          onError={() => {
+                            console.error("[Avatar] image failed to load:", avatarDisplayUrl);
+                            setAvatarLoadFailed(true);
+                          }}
+                        />
                       ) : (
                         <span className="text-4xl font-bold text-white">{initials}</span>
                       )}
@@ -426,24 +457,6 @@ const ProfilePage = () => {
                         )}
                       </div>
                     )}
-                  </div>
-                </section>
-
-                {/* F. SETTINGS */}
-                <section className={cardClass}>
-                  <div className="flex items-center gap-2 mb-6">
-                    <span className="text-xl">⚙️</span>
-                    <h2 className="text-lg font-semibold text-white">Preferences</h2>
-                  </div>
-                  
-                  <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5">
-                    <div>
-                      <p className="font-medium text-white">Dark Mode</p>
-                      <p className="text-xs text-gray-400">App is currently in dark mode</p>
-                    </div>
-                    <div className="w-12 h-6 bg-blue-600 rounded-full relative opacity-80 cursor-not-allowed">
-                      <div className="w-4 h-4 bg-white rounded-full absolute right-1 top-1"></div>
-                    </div>
                   </div>
                 </section>
               </div>

@@ -34,11 +34,35 @@ const corsOptions = {
 console.log("[CORS] Allowed origins:", allowedOrigins);
 console.log("[ENV] CLIENT_URL:", process.env.CLIENT_URL || "<not set>");
 
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 const path = require("path");
-app.use("/uploads", express.static(path.join(__dirname, "..", "..", "uploads")));
+const { UPLOADS_DIR } = require("./config/uploads");
+
+app.set("trust proxy", 1);
+app.use(
+  "/uploads",
+  express.static(UPLOADS_DIR, {
+    setHeaders: (res, filePath) => {
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      const ext = path.extname(filePath).toLowerCase();
+      if (ext === ".png") {
+        res.type("image/png");
+      } else if (ext === ".jpg" || ext === ".jpeg" || ext === ".webp") {
+        res.type(ext === ".webp" ? "image/webp" : "image/jpeg");
+      } else if (!ext) {
+        // Legacy multer hashes without extension — treat as JPEG
+        res.type("image/jpeg");
+      }
+    },
+  })
+);
+console.log("[UPLOADS] Serving static files from:", UPLOADS_DIR);
 app.use(morgan("dev"));
 
 app.use((req, _res, next) => {

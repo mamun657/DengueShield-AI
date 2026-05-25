@@ -1,14 +1,6 @@
 const User = require("../models/User");
 const Report = require("../models/Report");
-
-const resolvePhotoUrl = (req, photoUrl) => {
-  if (!photoUrl) return "";
-  if (/^https?:\/\//i.test(photoUrl)) return photoUrl;
-  if (photoUrl.startsWith("/")) {
-    return `${req.protocol}://${req.get("host")}${photoUrl}`;
-  }
-  return photoUrl;
-};
+const { toStoredPhotoPath, resolvePhotoUrl } = require("../utils/photoUrl");
 
 // @desc    Get user profile
 // @route   GET /api/user/profile
@@ -21,6 +13,10 @@ const getUserProfile = async (req, res) => {
     }
     const payload = user.toObject();
     payload.photoUrl = resolvePhotoUrl(req, payload.photoUrl);
+    console.log("[Profile Photo] GET profile", {
+      stored: user.photoUrl,
+      resolved: payload.photoUrl,
+    });
     res.json(payload);
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
@@ -81,9 +77,15 @@ const uploadProfilePhoto = async (req, res) => {
       return res.status(400).json({ message: "No file provided" });
     }
 
-    // Save the file path as the user's photo URL (served from /uploads)
-    user.photoUrl = `/uploads/${req.file.filename}`;
+    user.photoUrl = toStoredPhotoPath(req.file.filename);
     const updatedUser = await user.save();
+    const resolvedPhotoUrl = resolvePhotoUrl(req, updatedUser.photoUrl);
+
+    console.log("[Profile Photo] upload saved", {
+      filename: req.file.filename,
+      storedPath: updatedUser.photoUrl,
+      resolvedUrl: resolvedPhotoUrl,
+    });
 
     res.json({
       _id: updatedUser._id,
@@ -94,7 +96,7 @@ const uploadProfilePhoto = async (req, res) => {
       pregnancyStatus: updatedUser.pregnancyStatus,
       chronicDiseases: updatedUser.chronicDiseases,
       emergencyContact: updatedUser.emergencyContact,
-      photoUrl: resolvePhotoUrl(req, updatedUser.photoUrl),
+      photoUrl: resolvedPhotoUrl,
     });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
