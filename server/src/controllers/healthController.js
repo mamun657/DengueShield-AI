@@ -139,6 +139,14 @@ const createHealthRecord = async (req, res) => {
       computed.riskSource
     );
 
+    try {
+      const { evaluateRiskNotifications } = require("../services/messagingService");
+      const io = req.app.get("io");
+      await evaluateRiskNotifications(record, io);
+    } catch (notifyError) {
+      console.warn("[Messaging] risk notification skipped:", notifyError.message);
+    }
+
     return res.status(201).json(record);
   } catch (error) {
     return res.status(400).json({ message: error.message });

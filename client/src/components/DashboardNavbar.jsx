@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { resolveAvatarUrl } from "../utils/avatarUrl";
+import NotificationBell from "./messaging/NotificationBell";
 
 const DashboardNavbar = ({ userName, userRole, userPhotoUrl, onLogout, onOpenSmartDoctor }) => {
   const { t } = useTranslation();
@@ -21,7 +22,7 @@ const DashboardNavbar = ({ userName, userRole, userPhotoUrl, onLogout, onOpenSma
   console.log("Current route:", location.pathname);
 
   return (
-    <nav className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 overflow-x-auto border-b border-white/10 bg-[#0f172a] px-6">
+    <nav className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-white/10 bg-[#0f172a] px-6">
       <Link to="/dashboard" className="flex shrink-0 items-center gap-2.5 transition-transform hover:scale-[1.02]">
         <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-cyan-500/10 p-1.5 shadow-[0_0_12px_rgba(34,211,238,0.2)]">
           <img src="/dengue-icon.png" alt="DengueShield AI Logo" className="h-full w-full object-contain [filter:invert(85%)_sepia(45%)_saturate(448%)_hue-rotate(130deg)_brightness(102%)_contrast(106%)] drop-shadow-[0_0_4px_rgba(34,211,238,0.6)]" />
@@ -133,6 +134,7 @@ const DashboardNavbar = ({ userName, userRole, userPhotoUrl, onLogout, onOpenSma
       </div>
 
       <div className="flex shrink-0 items-center gap-3 text-sm">
+        <NotificationBell />
         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-xs font-semibold text-white overflow-hidden">
           {resolvedPhotoUrl && !avatarLoadFailed ? (
             <img

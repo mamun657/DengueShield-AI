@@ -14,6 +14,8 @@ import {
   Cell,
 } from "recharts";
 import api from "../api";
+import { useMessaging } from "../context/MessagingContext";
+import NotificationBell from "../components/messaging/NotificationBell";
 
 const STATUS_COLORS = {
   CRITICAL: "bg-red-500/20 text-red-300 border-red-500/30",
@@ -345,6 +347,7 @@ const ConfirmModal = ({ open, title, message, confirmText, onConfirm, onCancel }
 };
 
 const AdminDashboard = () => {
+  const { openChat } = useMessaging();
   const [overview, setOverview] = useState({
     totalUsers: 0,
     totalRecords: 0,
@@ -693,8 +696,11 @@ const AdminDashboard = () => {
             AI-assisted dengue surveillance across hospitals, wards, and community clinics.
           </p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
-          Live status: {isLoading ? "Syncing" : "Operational"}
+        <div className="flex items-center gap-3">
+          <NotificationBell />
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
+            Live status: {isLoading ? "Syncing" : "Operational"}
+          </div>
         </div>
       </div>
 
@@ -945,6 +951,21 @@ const AdminDashboard = () => {
                       >
                         Export
                       </button>
+                      {(record.status === "CRITICAL" ||
+                        record.status === "HIGH" ||
+                        record.status === "FLAGGED") && (
+                        <button
+                          className="rounded-md border border-cyan-400/40 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-100 transition hover:bg-cyan-500/20"
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            const patientId = record.patient?._id || record.patient?.id;
+                            if (patientId) openChat({ patientId });
+                          }}
+                        >
+                          Message
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

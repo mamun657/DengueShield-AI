@@ -1,6 +1,7 @@
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { MessagingProvider } from "./context/MessagingContext";
 import { ClinicalStoreProvider } from "./store/useClinicalStore.jsx";
 import { OfflineProvider } from "./offline/OfflineProvider";
 import OfflineFallbackPage from "./pages/OfflineFallbackPage";
@@ -15,6 +16,7 @@ import FamilyViewPage from "./pages/FamilyViewPage";
 import ProfilePage from "./pages/ProfilePage";
 import ReportsPage from "./pages/ReportsPage";
 import GraphRagPage from "./pages/GraphRagPage";
+import MessagingPanel from "./components/messaging/MessagingPanel";
 
 
 const Nav = () => {
@@ -61,6 +63,7 @@ const Nav = () => {
 };
 
 const AppLayout = () => {
+  const { user } = useAuth();
   const location = useLocation();
   const hideGlobalNav =
     location.pathname === "/dashboard" ||
@@ -114,6 +117,7 @@ const AppLayout = () => {
         </Routes>
 
       </main>
+      {user && <MessagingPanel />}
       <Footer />
     </div>
   );
@@ -121,13 +125,15 @@ const AppLayout = () => {
 
 const App = () => (
   <AuthProvider>
-    <OfflineProvider>
-      <ClinicalStoreProvider>
-        <BrowserRouter>
-          <AppLayout />
-        </BrowserRouter>
-      </ClinicalStoreProvider>
-    </OfflineProvider>
+    <MessagingProvider>
+      <OfflineProvider>
+        <ClinicalStoreProvider>
+          <BrowserRouter>
+            <AppLayout />
+          </BrowserRouter>
+        </ClinicalStoreProvider>
+      </OfflineProvider>
+    </MessagingProvider>
   </AuthProvider>
 );
 

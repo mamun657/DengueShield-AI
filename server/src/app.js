@@ -78,7 +78,7 @@ app.use((req, _res, next) => {
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    limit: 150,
+    limit: 1000,
   })
 );
 
@@ -96,6 +96,7 @@ app.use("/api/hospitals", hospitalRoutes);
 app.use("/api/rag", require("./routes/ragRoutes"));
 app.use("/api/speech", require("./routes/speechRoutes"));
 app.use("/api/graphrag", require("./routes/graphRagRoutes"));
+app.use("/api/messaging", require("./routes/messagingRoutes"));
 
 
 
