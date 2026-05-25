@@ -21,7 +21,6 @@ const RiskSummary = ({
   showGuidance = true,
 }) => {
   const [showGuidanceAccordion, setShowGuidanceAccordion] = useState(false);
-  const [showScoreBreakdown, setShowScoreBreakdown] = useState(false);
 
   const clinical = useMemo(() => {
     if (assessment && assessment.riskScore != null) return formatClinicalRisk(assessment);
@@ -150,26 +149,6 @@ const RiskSummary = ({
           )}
         </div>
       </div>
-
-      {scoreFactors.length > 0 && (
-        <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
-          <button
-            type="button"
-            onClick={() => setShowScoreBreakdown((v) => !v)}
-            className="text-sm font-medium text-slate-300 hover:text-white"
-          >
-            {showScoreBreakdown ? "▼" : "▶"} Risk score breakdown
-          </button>
-          {showScoreBreakdown && (
-            <ul className="clinical-text mt-3 space-y-1.5 text-sm text-slate-400">
-              {scoreFactors.slice(0, 12).map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-              <li className="pt-2 font-semibold text-slate-200">Final score: {score}/100</li>
-            </ul>
-          )}
-        </div>
-      )}
 
       {showGuidanceAccordion && <GuidanceAccordion />}
 

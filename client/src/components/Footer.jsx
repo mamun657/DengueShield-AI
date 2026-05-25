@@ -10,27 +10,6 @@ const Footer = () => {
   return (
     <footer id="contact" className="relative z-20 border-t border-white/10 bg-[#0a1428]/85 text-slate-300 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-6 py-14 md:px-10">
-        <div className="mb-10 grid gap-4 rounded-3xl border border-[#d7e6ee30] bg-gradient-to-r from-[#e8f5f916] to-[#d5f0ea0f] p-5 md:grid-cols-[1.2fr_0.8fr] md:p-6">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-cyan-200/70">Health Alerts Newsletter</p>
-            <h4 className="mt-2 text-xl font-semibold text-white">Get clinical insights and prevention guidance</h4>
-            <p className="mt-2 text-sm text-slate-400">Weekly health updates tailored for families and care teams in Bangladesh.</p>
-          </div>
-          <form className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end" onSubmit={(e) => e.preventDefault()}>
-            <input
-              type="email"
-              placeholder="Enter your email"
-              className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-teal-200/50"
-            />
-            <button
-              type="submit"
-              className="rounded-xl bg-gradient-to-r from-teal-200 to-emerald-200 px-4 py-2.5 text-sm font-semibold text-[#06353f] transition duration-300 hover:-translate-y-0.5"
-            >
-              Subscribe
-            </button>
-          </form>
-        </div>
-
         <div className="grid grid-cols-1 gap-10 md:grid-cols-4 md:gap-8">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
