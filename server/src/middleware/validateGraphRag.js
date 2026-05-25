@@ -30,9 +30,14 @@ const validateAnalyze = (req, res, next) => {
   }
 
   req.graphRagInput = {
+    ...body,
     symptoms,
     day,
-    extras: body.extras || {},
+    extras: {
+      ...body.extras,
+      temp: body.temp ?? body.temperature,
+      temperature: body.temperature ?? body.temp,
+    },
   };
   return next();
 };

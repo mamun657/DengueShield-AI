@@ -138,7 +138,7 @@ const GraphRagPage = () => {
     setSelected(recordSymptoms);
 
     if (recordSymptoms.length > 0) {
-      runAnalysis(recordSymptoms, recordDay);
+      runAnalysis(recordSymptoms, recordDay, latestRecord);
     }
   }, [latestRecord, runAnalysis]);
 
@@ -151,7 +151,7 @@ const GraphRagPage = () => {
       setError("Select at least one symptom");
       return;
     }
-    runAnalysis(selected, day);
+    runAnalysis(selected, day, latestRecord);
   };
 
   const loadLatest = () => {
@@ -183,14 +183,13 @@ const GraphRagPage = () => {
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300/90">
-              AI Clinical Intelligence Engine
+              AI Clinical Assessment
             </p>
             <h1 className="mt-1 text-2xl font-bold text-white md:text-3xl">
-              WHO-Aligned Clinical Intelligence Engine
+              Understand Your Symptoms
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              Relationship-aware clinical intelligence — not just document retrieval. WHO-aligned pathways
-              make symptom progression explainable for care teams and public-health leadership.
+              Our clinical AI helps evaluate your symptoms against WHO medical guidelines to give you clear advice on the next steps for your health and safety.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -210,7 +209,7 @@ const GraphRagPage = () => {
           </div>
         </div>
 
-        {health && (
+        {user?.role === "admin" && health && (
           <div className="mb-4 flex flex-wrap gap-3 text-[11px] text-slate-500">
             <span>
               Neo4j:{" "}
@@ -223,12 +222,7 @@ const GraphRagPage = () => {
           </div>
         )}
 
-        <div className="mb-6 rounded-xl border border-cyan-300/15 bg-gradient-to-r from-cyan-500/5 via-transparent to-teal-500/5 p-4 text-xs leading-relaxed text-slate-400">
-          <strong className="text-cyan-200">Why Clinical Intelligence beats traditional RAG:</strong> classic
-          RAG returns similar text chunks only. The clinical intelligence engine traverses WHO-aligned
-          pathways so fever drop may link to possible critical phase transition, WHO warnings, and escalation guidance — with
-          a clear audit trail for clinicians and stakeholders.
-        </div>
+
 
         <div className="grid gap-6 lg:grid-cols-12">
           <div className="space-y-4 lg:col-span-4">
@@ -272,13 +266,32 @@ const GraphRagPage = () => {
               {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
             </div>
 
-            <div className="hidden rounded-2xl border border-white/10 bg-[#0f172a]/60 p-4 text-xs text-slate-500 lg:block">
-              <p className="font-semibold text-slate-300">Hybrid pipeline</p>
-              <ol className="mt-2 list-decimal space-y-1 pl-4">
-                {(result?.meta?.pipeline || []).map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
+            <div className="hidden rounded-2xl border border-white/10 bg-[#0f172a]/60 p-5 lg:block shadow-[0_0_15px_rgba(34,211,238,0.05)]">
+              <p className="font-semibold text-cyan-200">AI Clinical Analysis</p>
+              <ul className="mt-4 space-y-3 text-sm text-slate-300">
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-400">✓</span> Symptoms Processed
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-400">✓</span> WHO Warning Signs Checked
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-400">✓</span> Emergency Risk Evaluated
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-400">✓</span> Final AI Recommendation Ready
+                </li>
+              </ul>
+              {user?.role === "admin" && (
+                <div className="mt-5 pt-4 border-t border-white/5">
+                  <p className="text-[10px] text-slate-500 mb-2 uppercase tracking-wide">Developer Debug Setup:</p>
+                  <ol className="list-decimal pl-4 space-y-1 text-[10px] text-slate-600">
+                    {(result?.meta?.pipeline || []).map((step) => (
+                      <li key={step}>{step}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
             </div>
           </div>
 

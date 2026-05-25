@@ -75,7 +75,7 @@ const getAllUsers = async (_req, res) => {
 
 const getAllHealthRecords = async (_req, res) => {
   const records = await HealthRecord.find()
-    .populate("user", "name email role isActive pregnancyStatus")
+    .populate("user", "name email role isActive pregnancyStatus emergencyContact")
     .sort({ date: -1 });
   res.json(records);
 };

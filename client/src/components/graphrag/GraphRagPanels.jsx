@@ -1,3 +1,5 @@
+import { useAuth } from "../../context/AuthContext";
+
 const severityColor = {
   High: "from-rose-500/20 to-orange-500/10 border-rose-400/40 text-rose-100",
   "High Risk Suspicion": "from-rose-500/20 to-orange-500/10 border-rose-400/40 text-rose-100",
@@ -83,50 +85,70 @@ const RiskHeatmap = ({ riskScore, ml, severityLabel }) => {
   );
 };
 
-const ReasoningPanel = ({ reasoning = [], narrative, graphPath = [], triggeredFactors = [] }) => (
-  <div className="rounded-xl border border-cyan-300/20 bg-gradient-to-br from-cyan-500/5 to-blue-500/5 p-4">
-    <p className="text-xs uppercase tracking-[0.14em] text-cyan-200/90">AI Clinical Reasoning</p>
-    {narrative && <p className="mt-2 text-sm leading-relaxed text-slate-100">{narrative}</p>}
-    {triggeredFactors.length > 0 && (
-      <ul className="mt-3 space-y-1.5">
-        {triggeredFactors.map((line) => (
-          <li key={line} className="flex gap-2 text-xs text-slate-300">
-            <span className="text-cyan-400">▸</span>
-            <span>{line}</span>
+const ReasoningPanel = ({ narrative, triggeredFactors = [], reasoning = [], graphPath = [], isAdmin = false }) => {
+  if (!isAdmin) return null;
+
+  return (
+    <div className="rounded-xl border border-cyan-300/20 bg-gradient-to-br from-cyan-500/5 to-blue-500/5 p-4">
+      <p className="text-xs uppercase tracking-[0.14em] text-cyan-200/90">AI Clinical Summary</p>
+      {narrative && <p className="mt-2 text-sm leading-relaxed text-slate-100">{narrative}</p>}
+      
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        {triggeredFactors.length > 0 && (
+          <div>
+            <p className="mb-2 text-[10px] uppercase tracking-wider text-slate-500">Key Factors</p>
+            <ul className="space-y-1.5">
+              {triggeredFactors.map((line) => (
+                <li key={line} className="flex gap-2 text-xs text-slate-300">
+                  <span className="text-cyan-400 mt-0.5">•</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {reasoning.length > 0 && (
+          <div>
+            <p className="mb-2 text-[10px] uppercase tracking-wider text-slate-500">Clinical Reasoning</p>
+            <ul className="space-y-1.5">
+              {reasoning.map((line) => (
+                <li key={line} className="flex gap-2 text-xs text-slate-300">
+                  <span className="text-cyan-400 mt-0.5">•</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {isAdmin && graphPath.length > 0 && (
+        <div className="mt-4 rounded-lg border border-white/10 bg-black/20 p-2">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500">Clinical Decision Pathway (Admin Debug)</p>
+          <p className="mt-1 font-mono text-[11px] text-cyan-100">{graphPath.join(" → ")}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const GraphTraversalPanel = ({ paths = [], isAdmin = false }) => {
+  if (!isAdmin) return null;
+  return (
+    <div className="max-h-48 overflow-y-auto rounded-xl border border-white/10 bg-black/25 p-3">
+      <p className="text-xs uppercase tracking-wider text-slate-400">Clinical Reasoning Log (Admin Debug)</p>
+      <ul className="mt-2 space-y-1">
+        {(paths.slice(0, 12) || []).map((p, i) => (
+          <li key={`${p.path}-${i}`} className="font-mono text-[10px] text-slate-400">
+            {p.path}
           </li>
         ))}
+        {!paths.length && <li className="text-xs text-slate-500">No clinical pathways recorded</li>}
       </ul>
-    )}
-    <ul className="mt-3 space-y-1.5">
-      {reasoning.map((line) => (
-        <li key={line} className="flex gap-2 text-xs text-slate-300">
-          <span className="text-cyan-400">▸</span>
-          <span>{line}</span>
-        </li>
-      ))}
-    </ul>
-    {graphPath.length > 0 && (
-      <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-2">
-        <p className="text-[10px] uppercase tracking-wider text-slate-500">Clinical Decision Pathway</p>
-        <p className="mt-1 font-mono text-[11px] text-cyan-100">{graphPath.join(" → ")}</p>
-      </div>
-    )}
-  </div>
-);
-
-const GraphTraversalPanel = ({ paths = [] }) => (
-  <div className="max-h-48 overflow-y-auto rounded-xl border border-white/10 bg-black/25 p-3">
-    <p className="text-xs uppercase tracking-wider text-slate-400">Clinical Reasoning Log</p>
-    <ul className="mt-2 space-y-1">
-      {(paths.slice(0, 12) || []).map((p, i) => (
-        <li key={`${p.path}-${i}`} className="font-mono text-[10px] text-slate-400">
-          {p.path}
-        </li>
-      ))}
-      {!paths.length && <li className="text-xs text-slate-500">No clinical pathways recorded</li>}
-    </ul>
-  </div>
-);
+    </div>
+  );
+};
 
 const ElevatedBanner = ({ active, recommendation, scoreLine }) => {
   if (!active) return null;
@@ -141,6 +163,9 @@ const ElevatedBanner = ({ active, recommendation, scoreLine }) => {
 };
 
 const GraphRagPanels = ({ result, loading }) => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
   if (loading) {
     return (
       <div className="grid gap-3 md:grid-cols-2">
@@ -200,8 +225,9 @@ const GraphRagPanels = ({ result, loading }) => {
         narrative={result.narrative}
         graphPath={result.graphPath}
         triggeredFactors={result.triggeredFactors}
+        isAdmin={isAdmin}
       />
-      <GraphTraversalPanel paths={result.graph?.paths} />
+      <GraphTraversalPanel paths={result.graph?.paths} isAdmin={isAdmin} />
 
       <p className="text-[11px] text-slate-500">{result.medicalDisclaimer}</p>
     </div>

@@ -1039,7 +1039,22 @@ const AdminDashboard = () => {
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <h3 className="text-sm font-semibold text-white">Profile Snapshot</h3>
                   <div className="mt-2 grid gap-3 sm:grid-cols-2 text-sm text-slate-300">
-
+                    <div>
+                      <p className="text-xs text-slate-400">Emergency Contact</p>
+                      {selectedPatient.patient?.emergencyContact ? (
+                        <div className="flex items-center gap-2">
+                          <p className="text-white">{selectedPatient.patient.emergencyContact}</p>
+                          <a
+                            href={`tel:${selectedPatient.patient.emergencyContact}`}
+                            className="rounded bg-rose-500/20 px-2 py-0.5 text-[10px] text-rose-400 hover:bg-rose-500/30"
+                          >
+                            Call
+                          </a>
+                        </div>
+                      ) : (
+                        <p className="text-white">Not provided</p>
+                      )}
+                    </div>
                     <div>
                       <p className="text-xs text-slate-400">Pregnancy Status</p>
                       <p className="text-white">
