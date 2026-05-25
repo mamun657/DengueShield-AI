@@ -14,6 +14,7 @@ const UserSchema = new mongoose.Schema(
     weight: { type: Number },
     chronicDiseases: { type: String },
     emergencyContact: { type: String },
+    photoUrl: { type: String, default: "" },
     familyShareToken: { type: String, default: null },
   },
   { timestamps: true }

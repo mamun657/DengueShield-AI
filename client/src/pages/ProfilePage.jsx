@@ -1,14 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import DashboardNavbar from "../components/DashboardNavbar";
 import api from "../api";
+import useOfflineStatus from "../hooks/useOfflineStatus";
 
 const ProfilePage = () => {
   const { t } = useTranslation();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   
   const [profile, setProfile] = useState(null);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [uploadError, setUploadError] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef(null);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -32,6 +38,7 @@ const ProfilePage = () => {
       ]);
       
       setProfile(profileRes.data);
+      updateUser(profileRes.data);
       setEditForm({
         name: profileRes.data.name || "",
         age: profileRes.data.age || "",
@@ -61,11 +68,37 @@ const ProfilePage = () => {
       setSaving(true);
       setError("");
       setSuccess("");
-      
-      const res = await api.put("/user/profile", editForm);
-      setProfile(res.data);
+      // Avoid sending large base64 images inline (server express.json limit 1MB).
+      // Send only the profile fields in this request; handle photo upload separately.
+      const res = await api.put("/user/profile", { ...editForm });
+      // if a photo was selected, upload it as multipart to dedicated endpoint
+      if (photoFile) {
+        try {
+          const fd = new FormData();
+          fd.append('photo', photoFile);
+          const uploadRes = await api.post('/user/profile/photo', fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            onUploadProgress: (evt) => {
+              if (evt.total) setUploadProgress(Math.round((evt.loaded / evt.total) * 100));
+            }
+          });
+          setProfile(uploadRes.data);
+          updateUser(uploadRes.data);
+          setPhotoFile(null);
+          setPhotoPreview(null);
+          setUploadProgress(0);
+          setUploadError("");
+          setSuccess('Profile and photo uploaded successfully');
+        } catch (err) {
+          setSuccess('Profile saved but photo upload failed');
+          setUploadError(err?.response?.data?.message || 'Photo upload failed');
+        }
+      } else {
+        setProfile(res.data);
+        updateUser(res.data);
+        setSuccess("Profile updated successfully!");
+      }
       setIsEditing(false);
-      setSuccess("Profile updated successfully!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to update profile");
@@ -75,13 +108,14 @@ const ProfilePage = () => {
   };
 
   const initials = (profile?.name || user?.name || "U").trim().charAt(0).toUpperCase();
+  const { isOnline, syncStatus, lastSyncMessage } = useOfflineStatus();
 
   const latestRiskScore = reports.length > 0 ? reports[0].reportData?.riskScore || 0 : 0;
   const isHighRisk = latestRiskScore > 65;
 
-  const cardClass = "bg-white/5 border border-white/10 rounded-xl p-5 md:p-6 shadow-md backdrop-blur-md";
-  const labelClass = "block text-sm font-medium text-gray-400 mb-1";
-  const inputClass = "w-full bg-slate-800/50 border border-white/10 rounded-lg p-2.5 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all";
+  const cardClass = "bg-gradient-to-tr from-white/3 to-white/2 border border-white/6 rounded-2xl p-6 shadow-[0_10px_30px_rgba(2,6,23,0.6)] backdrop-blur-sm";
+  const labelClass = "block text-sm font-medium text-slate-300 mb-1";
+  const inputClass = "w-full bg-[#0b1220]/60 border border-white/6 rounded-lg p-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 transition-all";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#111827] to-[#1e1b4b] text-white">
@@ -147,40 +181,136 @@ const ProfilePage = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* A. USER INFO */}
+            {/* A. USER INFO - modern header with upload */}
             <section className={`${cardClass} flex flex-col md:flex-row items-center md:items-start gap-6`}>
-              <div className="shrink-0 relative">
-                <div className="w-24 h-24 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-full flex items-center justify-center text-4xl font-bold shadow-xl border-4 border-[#0f172a]">
-                  {initials}
-                </div>
-                {isEditing && (
-                  <div className="absolute bottom-0 right-0 w-8 h-8 bg-slate-700 border-2 border-[#0f172a] rounded-full flex items-center justify-center text-xs cursor-pointer hover:bg-slate-600 transition">
-                    ✏️
+              <div className="shrink-0 relative flex items-center gap-4">
+                <div className="relative">
+                  <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-cyan-400/70 to-indigo-600/60 shadow-[0_10px_30px_rgba(6,12,30,0.6)]">
+                    <div className="w-full h-full rounded-full bg-[#061025] flex items-center justify-center overflow-hidden border-[3px] border-[#071226]">
+                      {photoPreview ? (
+                        <img src={photoPreview} alt="avatar" className="w-full h-full object-cover" />
+                      ) : profile?.photoUrl ? (
+                        <img src={profile.photoUrl} alt="avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-4xl font-bold text-white">{initials}</span>
+                      )}
+                    </div>
                   </div>
-                )}
+
+                  <div className="absolute -bottom-1 right-0 flex items-center gap-2">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-sm px-3 py-1 rounded-full bg-cyan-600/90 hover:bg-cyan-500 transition text-white shadow-sm"
+                    >
+                      Change Photo
+                    </button>
+                  </div>
+                </div>
+
+                <div className="w-0.5 h-20 bg-white/6 rounded" />
               </div>
-              
-              <div className="flex-1 w-full space-y-4 text-center md:text-left mt-2 md:mt-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              <div className="flex-1 w-full space-y-2 text-center md:text-left mt-2 md:mt-0">
+                <div className="flex items-start justify-between gap-4">
                   <div>
-                    <label className={labelClass}>Full Name</label>
-                    {isEditing ? (
-                      <input 
-                        type="text" 
-                        name="name" 
-                        value={editForm.name} 
-                        onChange={handleInputChange} 
-                        className={inputClass}
-                      />
-                    ) : (
-                      <p className="text-xl font-bold text-white">{profile?.name}</p>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-2xl font-semibold text-white leading-tight">{profile?.name || editForm.name}</h2>
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/4 px-3 py-1 text-sm text-slate-200">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="opacity-90"><path d="M12 11c1.657 0 3-1.343 3-3S13.657 5 12 5s-3 1.343-3 3 1.343 3 3 3z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        Telehealth User
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full bg-emerald-600/10 px-3 py-1 text-sm text-emerald-200">
+                        Verified
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-300 mt-1">{profile?.email}</p>
+                    <p className="text-xs text-slate-400 mt-1">{isOnline ? `Online · ${syncStatus}` : `Offline · ${syncStatus}`}{lastSyncMessage ? ` — ${lastSyncMessage}` : ""}</p>
                   </div>
-                  <div>
-                    <label className={labelClass}>Email Address</label>
-                    <p className="text-gray-300 py-1">{profile?.email}</p>
+
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-sm text-slate-300">Last sync</p>
+                      <p className="text-sm font-medium text-white">{profile?.lastSynced ? new Date(profile.lastSynced).toLocaleString() : "Not synced"}</p>
+                    </div>
                   </div>
                 </div>
+
+                {uploadError && <div className="text-sm text-rose-400 mt-2">{uploadError}</div>}
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const f = e.dataTransfer?.files?.[0];
+                    if (!f) return;
+                    const okTypes = ["image/jpeg","image/png","image/webp"];
+                    setUploadError("");
+                    if (!okTypes.includes(f.type)) { setUploadError("Only JPG, PNG or WEBP allowed"); return; }
+                    if (f.size <= 5 * 1024 * 1024) {
+                      setPhotoFile(f);
+                      setPhotoPreview(URL.createObjectURL(f));
+                      return;
+                    }
+                    try {
+                      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(f); });
+                      const canvas = document.createElement('canvas');
+                      const maxW = 1200;
+                      const scale = Math.min(1, maxW / img.width);
+                      canvas.width = img.width * scale;
+                      canvas.height = img.height * scale;
+                      const ctx = canvas.getContext('2d');
+                      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                      setUploadProgress(20);
+                      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                      const res = await fetch(dataUrl);
+                      const blob = await res.blob();
+                      if (blob.size > 5 * 1024 * 1024) { setUploadError('Image too large even after compression (5MB max)'); return; }
+                      const compressedFile = new File([blob], f.name.replace(/\.[^/.]+$/, '') + '.jpg', { type: blob.type });
+                      setPhotoFile(compressedFile);
+                      setPhotoPreview(URL.createObjectURL(compressedFile));
+                      setUploadProgress(100);
+                    } catch (err) {
+                      setUploadError('Failed to process image');
+                    }
+                  }}
+                  className="mt-3 p-3 border-2 border-dashed border-white/6 rounded-lg text-sm text-slate-300 bg-black/10">
+                  Drag & drop an image here, or click "Change Photo"
+                </div>
+                <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  setUploadError("");
+                  if (!f) return;
+                  const okTypes = ["image/jpeg","image/png","image/webp"];
+                  if (!okTypes.includes(f.type)) { setUploadError("Only JPG, PNG or WEBP allowed"); return; }
+                  if (f.size <= 5 * 1024 * 1024) {
+                    setPhotoFile(f);
+                    setPhotoPreview(URL.createObjectURL(f));
+                    return;
+                  }
+                  // try compressing using canvas
+                  try {
+                    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(f); });
+                    const canvas = document.createElement('canvas');
+                    const maxW = 1200;
+                    const scale = Math.min(1, maxW / img.width);
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    setUploadError("");
+                    setUploadProgress(20);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    // convert to blob
+                    const res = await fetch(dataUrl);
+                    const blob = await res.blob();
+                    if (blob.size > 5 * 1024 * 1024) { setUploadError('Image too large even after compression (5MB max)'); return; }
+                    const compressedFile = new File([blob], f.name.replace(/\.[^/.]+$/, '') + '.jpg', { type: blob.type });
+                    setPhotoFile(compressedFile);
+                    setPhotoPreview(URL.createObjectURL(compressedFile));
+                    setUploadProgress(100);
+                  } catch (err) {
+                    setUploadError('Failed to process image');
+                  }
+                }} />
               </div>
             </section>
 

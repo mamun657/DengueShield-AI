@@ -52,7 +52,17 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  const value = useMemo(() => ({ user, login, logout }), [user]);
+  const updateUser = (updates) => {
+    if (!updates) return;
+    setUser((prev) => {
+      const merged = { ...(prev || {}), ...updates };
+      if (merged.role) merged.role = String(merged.role).toLowerCase();
+      localStorage.setItem("user", JSON.stringify(merged));
+      return merged;
+    });
+  };
+
+  const value = useMemo(() => ({ user, login, logout, updateUser }), [user]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 

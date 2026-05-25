@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
 import api from "../api";
+import { API_BASE_URL } from "../config/apiBase";
 import {
   loadDashboardData,
   submitSymptomRecord,
@@ -357,8 +358,7 @@ const DashboardPage = () => {
   const displayRiskScore = resolvedAssessment?.riskScore ?? null;
 
   const rashMaxSizeMb = 5;
-  const rashApiBase = import.meta.env.VITE_ML_API_URL || "http://127.0.0.1:5001";
-  const rashApiUrl = `${rashApiBase}/api/rash/predict`;
+  const rashApiUrl = `${API_BASE_URL}/rash/predict`;
   const rashAllowedTypes = ["image/jpeg", "image/png"];
 
   const [isReportsModalOpen, setIsReportsModalOpen] = useState(false);

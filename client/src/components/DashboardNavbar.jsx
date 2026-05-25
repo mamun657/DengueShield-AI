@@ -1,10 +1,15 @@
 import { useTranslation } from "react-i18next";
 import { Link, NavLink } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
-const DashboardNavbar = ({ userName, userRole, onLogout, onOpenSmartDoctor }) => {
+const DashboardNavbar = ({ userName, userRole, userPhotoUrl, onLogout, onOpenSmartDoctor }) => {
   const { t } = useTranslation();
-  const isAdmin = String(userRole || "").toLowerCase() === "admin";
-  const initials = (userName || "U").trim().charAt(0).toUpperCase();
+  const { user } = useAuth();
+  const resolvedName = userName || user?.name;
+  const resolvedRole = userRole || user?.role;
+  const resolvedPhotoUrl = userPhotoUrl || user?.photoUrl;
+  const isAdmin = String(resolvedRole || "").toLowerCase() === "admin";
+  const initials = (resolvedName || "U").trim().charAt(0).toUpperCase();
 
   console.log("Current route:", location.pathname);
 
@@ -121,10 +126,18 @@ const DashboardNavbar = ({ userName, userRole, onLogout, onOpenSmartDoctor }) =>
       </div>
 
       <div className="flex shrink-0 items-center gap-3 text-sm">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-xs font-semibold text-white">
-          {initials}
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-xs font-semibold text-white overflow-hidden">
+          {resolvedPhotoUrl ? (
+            <img
+              src={resolvedPhotoUrl}
+              alt={resolvedName ? `${resolvedName} avatar` : "User avatar"}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            initials
+          )}
         </div>
-        <span className="text-gray-300">{userName || t("user")}</span>
+        <span className="text-gray-300">{resolvedName || t("user")}</span>
         <button className="text-gray-300 transition hover:text-white" onClick={onLogout} type="button">
           {t("logout")}
         </button>

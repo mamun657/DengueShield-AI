@@ -13,6 +13,15 @@ const requireEnv = (key) => {
 
 const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
 
+const resolvePhotoUrl = (req, photoUrl) => {
+  if (!photoUrl) return "";
+  if (/^https?:\/\//i.test(photoUrl)) return photoUrl;
+  if (photoUrl.startsWith("/")) {
+    return `${req.protocol}://${req.get("host")}${photoUrl}`;
+  }
+  return photoUrl;
+};
+
 const signToken = (id, role) =>
   jwt.sign({ id, role }, requireEnv("JWT_SECRET"), { expiresIn: "7d" });
 
@@ -35,7 +44,13 @@ const register = async (req, res) => {
     });
     return res.status(201).json({
       token: signToken(user._id, user.role),
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        photoUrl: resolvePhotoUrl(req, user.photoUrl),
+      },
     });
   } catch (error) {
     const status = error.statusCode || 400;
@@ -63,7 +78,13 @@ const login = async (req, res) => {
 
     return res.json({
       token: signToken(user._id, user.role),
-      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        photoUrl: resolvePhotoUrl(req, user.photoUrl),
+      },
     });
   } catch (error) {
     const status = error.statusCode || 500;

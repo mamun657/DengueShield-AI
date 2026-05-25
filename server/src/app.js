@@ -36,6 +36,8 @@ console.log("[ENV] CLIENT_URL:", process.env.CLIENT_URL || "<not set>");
 app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
+const path = require("path");
+app.use("/uploads", express.static(path.join(__dirname, "..", "..", "uploads")));
 app.use(morgan("dev"));
 
 app.use((req, _res, next) => {
@@ -61,6 +63,7 @@ app.post("/api/chat", askMedicalQuestion);
 app.post("/api/smart-doctor", askMedicalQuestion);
 app.use("/api/auth", authRoutes);
 app.use("/api/user", require("./routes/userRoutes"));
+app.use("/api/rash", require("./routes/rashRoutes"));
 app.use("/api/health", healthRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/admin", adminRoutes);
