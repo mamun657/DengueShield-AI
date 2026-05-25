@@ -255,7 +255,7 @@ const ChatBox = ({ isOpen, onClose, patientData }) => {
       const data = await sendChatMessage({ message: text, history: nextMessages, patient_data: patientData });
       const reply = String(data?.reply || "").trim() || "Sorry, I could not respond right now.";
       setMessages([...nextMessages, { role: "assistant", content: reply }]);
-      if (data?.warning) {
+      if (data?.warning && !reply.includes("According to the WHO guideline")) {
         setSendError("Smart Doctor is temporarily unavailable. Please try again in a moment.");
       }
     } catch (err) {

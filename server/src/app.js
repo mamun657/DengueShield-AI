@@ -16,6 +16,7 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:5173",
   "https://dengueshield-ai.onrender.com",
+  "https://dengueshield-ui.onrender.com",
 ];
 
 if (process.env.CLIENT_URL) {

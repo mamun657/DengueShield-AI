@@ -59,8 +59,23 @@ const askGroqDirect = async (text, patient_data) => {
   return reply;
 };
 
+const WHO_WARNING_SIGNS_REPLY =
+  "According to the WHO guideline, dengue warning signs include:\n" +
+  "1. Persistent vomiting\n" +
+  "2. Severe abdominal pain\n" +
+  "3. Mucosal bleed (gums, nose, or easy bruising)\n" +
+  "4. Restlessness or lethargy\n" +
+  "5. Liver enlargement (> 2 cm)\n" +
+  "6. Clinical fluid accumulation (ascites, pleural effusion)\n" +
+  "7. Rapid decrease in platelet count with rising hematocrit\n\n" +
+  "If any warning sign appears, seek urgent medical care immediately. This is guidance only, not a diagnosis.";
+
 const buildLocalChatReply = (message) => {
   const text = String(message || "").toLowerCase();
+
+  if (/(warning sign|warning signs|who warning)/.test(text)) {
+    return WHO_WARNING_SIGNS_REPLY;
+  }
 
   if (/(^|\b)(hi|hello|hey|hola|assalam|salam|good morning|good afternoon)(\b|$)/.test(text)) {
     return "Hi! Tell me your symptoms or ask about dengue.";
@@ -77,10 +92,33 @@ const buildLocalChatReply = (message) => {
   return "Please describe your symptoms (fever, rash, headache, bleeding, vomiting). I provide probabilistic risk guidance, not a definitive diagnosis.";
 };
 
+const isLoopbackMlUrl = (url) => /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?/i.test(String(url || ""));
+
+const shouldCallExternalMl = () => {
+  const configured = Boolean(
+    process.env.ML_API_URL || process.env.PYTHON_API_URL || process.env.VITE_ML_API_URL
+  );
+  if (!configured) return false;
+
+  const base = getMlBaseUrl();
+  if (process.env.NODE_ENV === "production" && isLoopbackMlUrl(base)) {
+    console.warn(
+      "[CHAT] Skipping external ML in production because ML_API_URL points to localhost:",
+      base
+    );
+    return false;
+  }
+
+  return true;
+};
+
 // @desc    Ask a medical question to the AI using RAG
 // @route   POST /api/rag/ask
 // @access  Public
 const askMedicalQuestion = async (req, res) => {
+  const { question, message, patient_data } = req.body || {};
+  const text = String(question || message || "").trim();
+
   try {
     console.log("CHAT REQUEST RECEIVED", {
       path: req.path,
@@ -91,44 +129,59 @@ const askMedicalQuestion = async (req, res) => {
         "content-type": req.headers["content-type"],
       },
     });
-    const { question, message, patient_data } = req.body;
-    const text = question || message;
-    console.log("[CHAT ENV] ML_API_URL", process.env.ML_API_URL, "PYTHON_API_URL", process.env.PYTHON_API_URL, "VITE_ML_API_URL", process.env.VITE_ML_API_URL);
-    
+    console.log(
+      "[CHAT ENV]",
+      "ML_API_URL",
+      process.env.ML_API_URL,
+      "PYTHON_API_URL",
+      process.env.PYTHON_API_URL,
+      "GROQ",
+      Boolean(process.env.GROQ_API_KEY)
+    );
+
     if (!text) {
       return res.status(400).json({ success: false, answer: "Question is required" });
     }
 
-    const hasExternalMlService = Boolean(
-      process.env.ML_API_URL || process.env.PYTHON_API_URL || process.env.VITE_ML_API_URL
-    );
-
-    if (hasExternalMlService) {
+    if (shouldCallExternalMl()) {
       const externalMlUrl = buildMlUrl("/chat");
-      console.log("CALLING EXTERNAL ML SERVICE", { url: externalMlUrl, payload: { message: text, patient_data } });
-      const response = await axios.post(
-        externalMlUrl,
-        {
-          message: text,
-          patient_data: patient_data || {},
-        },
-        { timeout: 8000 }
-      );
-
-      console.log("[EXTERNAL ML RESPONSE]", { status: response.status, data: response.data });
-
-      if (response.status >= 200 && response.status < 300) {
-        return res.json({
-          success: true,
-          answer: response.data.reply || response.data.answer || "Not found in guideline",
-          context: response.data.rag_scores || [],
+      try {
+        console.log("CALLING EXTERNAL ML SERVICE", {
+          url: externalMlUrl,
+          payload: { message: text, patient_data },
         });
-      }
+        const response = await axios.post(
+          externalMlUrl,
+          {
+            message: text,
+            patient_data: patient_data || {},
+          },
+          { timeout: 8000, validateStatus: () => true }
+        );
 
-      console.warn("External ML service returned non-2xx status, falling back to direct Groq chat.", {
-        status: response.status,
-        data: response.data,
-      });
+        console.log("[EXTERNAL ML RESPONSE]", { status: response.status, data: response.data });
+
+        if (response.status >= 200 && response.status < 300) {
+          const answer = response.data?.reply || response.data?.answer;
+          if (answer) {
+            return res.json({
+              success: true,
+              answer,
+              context: response.data?.rag_scores || [],
+            });
+          }
+        }
+
+        console.warn("External ML service unavailable or empty, falling back to Groq.", {
+          status: response.status,
+          data: response.data,
+        });
+      } catch (mlError) {
+        console.warn(
+          "External ML service request failed, falling back to Groq.",
+          mlError.response?.status || mlError.message
+        );
+      }
     }
 
     const directReply = await askGroqDirect(text, patient_data);

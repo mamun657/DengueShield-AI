@@ -13,8 +13,23 @@ const mlApi = axios.create({
   validateStatus: () => true,
 });
 
+const WHO_WARNING_SIGNS_REPLY =
+  "According to the WHO guideline, dengue warning signs include:\n" +
+  "1. Persistent vomiting\n" +
+  "2. Severe abdominal pain\n" +
+  "3. Mucosal bleed (gums, nose, or easy bruising)\n" +
+  "4. Restlessness or lethargy\n" +
+  "5. Liver enlargement (> 2 cm)\n" +
+  "6. Clinical fluid accumulation (ascites, pleural effusion)\n" +
+  "7. Rapid decrease in platelet count with rising hematocrit\n\n" +
+  "If any warning sign appears, seek urgent medical care immediately. This is guidance only, not a diagnosis.";
+
 const buildLocalChatReply = (message) => {
   const text = String(message || "").toLowerCase();
+
+  if (/(warning sign|warning signs|who warning)/.test(text)) {
+    return WHO_WARNING_SIGNS_REPLY;
+  }
 
   if (/(^|\b)(hi|hello|hey|hola|assalam|salam|yo|good morning|good afternoon)(\b|$)/.test(text)) {
     return "Hi! Tell me your symptoms or ask about dengue.";
@@ -115,6 +130,7 @@ export const sendChatMessage = async ({ message, history, patient_data }) => {
     return {
       reply,
       context: response.data.context || [],
+      warning: Boolean(response.data?.warning),
     };
   } catch (err) {
     const errorMsg = err?.response?.data?.answer || err?.response?.data?.message || err.message || "Chat API failed";
