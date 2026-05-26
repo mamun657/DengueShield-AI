@@ -8,7 +8,7 @@
 <p align="center">
   <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=700&size=26&pause=1000&color=00FFCC&center=true&vCenter=true&width=950&lines=🤖+AI+Powered+Farming;🌾+Smart+Agriculture+Monitoring;📸+Crop+Disease+Detection;💹+AI+Market+Price+Prediction;🌦+Weather+%26+Irrigation+Insights;🎙+Bangla+Voice+Assistant;📊+Real-Time+Farmer+Analytics" alt="Typing SVG" />
 </p>
----
+
 <p align="center">
   <img src="https://img.shields.io/badge/AI-Agriculture-00FFCC?style=for-the-badge&logo=leaflet&logoColor=white"/>
   <img src="https://img.shields.io/badge/Crop%20Detection-CNN-green?style=for-the-badge"/>
