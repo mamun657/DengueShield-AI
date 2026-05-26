@@ -44,6 +44,47 @@ const RecenterMap = ({ lat, lng }) => {
   return null;
 };
 
+// Helper function to generate optimal Google Maps URL
+const generateGoogleMapsUrl = (hospital) => {
+  // Validate required data
+  if (!hospital || !hospital.name) {
+    console.warn("Invalid hospital data:", hospital);
+    return "https://www.google.com/maps";
+  }
+
+  const { name, lat, lng, place_id } = hospital;
+
+  // Validate coordinates
+  const hasValidCoords = lat != null && lng != null && !isNaN(lat) && !isNaN(lng);
+  
+  if (!hasValidCoords) {
+    console.warn(`Invalid coordinates for hospital "${name}":`, { lat, lng });
+  }
+
+  // Log hospital data for debugging
+  console.log("🏥 Opening Maps for Hospital:", {
+    name,
+    lat,
+    lng,
+    place_id,
+    hasValidCoords
+  });
+
+  // Option 1: Use place_id if available (most reliable)
+  if (place_id && place_id.trim()) {
+    const encodedName = encodeURIComponent(name);
+    const url = `https://www.google.com/maps/search/${encodedName}/@${lat},${lng},15z?entry=ttu&place_id=${encodeURIComponent(place_id)}`;
+    console.log("Using place_id URL:", url);
+    return url;
+  }
+
+  // Option 2: Search by hospital name (safest fallback)
+  const encodedName = encodeURIComponent(name);
+  const url = `https://www.google.com/maps/search/?api=1&query=${encodedName}`;
+  console.log("Using name search URL:", url);
+  return url;
+};
+
 const NearbyHospitals = ({ riskScore }) => {
   const [hospitals, setHospitals] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
@@ -75,7 +116,39 @@ const NearbyHospitals = ({ riskScore }) => {
 
           // API Call to Node.js backend
           const response = await api.get(`/hospitals/nearby?lat=${latitude}&lng=${longitude}`);
-          setHospitals(response.data.hospitals);
+          
+          // Validate and filter hospital data
+          const rawHospitals = response.data.hospitals || [];
+          console.log("📍 Raw hospitals from API:", rawHospitals);
+          
+          const validatedHospitals = rawHospitals
+            .filter((h) => {
+              // Validate required fields
+              const isValid = h && 
+                h.name && 
+                typeof h.lat === 'number' && 
+                typeof h.lng === 'number' && 
+                !isNaN(h.lat) && 
+                !isNaN(h.lng);
+              
+              if (!isValid) {
+                console.warn("❌ Invalid hospital data:", h);
+              }
+              return isValid;
+            })
+            .map((h, idx) => {
+              console.log(`✅ Hospital ${idx + 1}:`, {
+                name: h.name,
+                lat: h.lat,
+                lng: h.lng,
+                distance: h.distanceKm,
+                place_id: h.place_id || "N/A"
+              });
+              return h;
+            });
+
+          console.log("✅ Validated hospitals count:", validatedHospitals.length);
+          setHospitals(validatedHospitals);
           setLocationStatus("");
         } catch (err) {
           console.error("Error fetching hospitals:", err);
@@ -254,7 +327,7 @@ const NearbyHospitals = ({ riskScore }) => {
                     {/* Subtle shine effect on hover */}
                     <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/5 to-transparent group-hover:animate-[shimmer_1s_infinite] pointer-events-none"></div>
 
-                    <div className="flex-1 relative z-10">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className={`font-extrabold text-lg sm:text-xl ${index === 0 ? "text-white" : "text-slate-200"} group-hover:text-white transition-colors`}>
                           🏥 {hospital.name}
@@ -276,16 +349,12 @@ const NearbyHospitals = ({ riskScore }) => {
                     </div>
                     
                     <a
-                      href={hospital.mapsUrl}
+                      href={generateGoogleMapsUrl(hospital)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`shrink-0 flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 relative z-10 ${
-                        index === 0
-                          ? "bg-red-500 hover:bg-red-600 text-white shadow-[0_4px_20px_0_rgba(239,68,68,0.4)] hover:shadow-[0_8px_25px_rgba(239,68,68,0.5)] border border-red-400/50"
-                          : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-[0_4px_20px_0_rgba(16,185,129,0.3)] hover:shadow-[0_8px_25px_rgba(16,185,129,0.4)] border border-emerald-400/50"
-                      }`}
+                      className="text-sm px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-all shadow-[0_4px_15px_rgba(59,130,246,0.2)] hover:shadow-lg"
                     >
-                      <span className="text-base">📍</span> Open Map
+                      Open in Maps
                     </a>
                   </div>
                 ))}

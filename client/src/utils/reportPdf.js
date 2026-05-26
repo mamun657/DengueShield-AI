@@ -501,12 +501,14 @@ export const generateMedicalReportPdf = ({ patient, latestReport }) => {
 
   y = drawSectionHeader(doc, y, "6. IMPORTANT MEDICAL DISCLAIMER", left, right, headerColor);
   const disclaimerLines = splitByWidth(doc, MEDICAL_DISCLAIMER, right - left - 24);
-  const discHeight = disclaimerLines.length * 12 + 24;
+  const discHeight = disclaimerLines.length * 14 + 32;
   y = ensureSpace(doc, y, discHeight);
-  doc.setFillColor(255, 251, 235);
-  doc.setDrawColor(251, 191, 36);
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(251, 146, 60);
   doc.roundedRect(left, y, right - left, discHeight, 4, 4, "FD");
-  pdfTextLines(doc, disclaimerLines, left + 12, y + 14, 12, { fontSize: 8 });
+  resetPdfTypography(doc, { fontSize: 8 });
+  doc.setTextColor(34, 34, 34);
+  pdfTextLines(doc, disclaimerLines, left + 12, y + 16, 14, { fontSize: 8 });
 
   const footerY = pageHeight - 30;
   doc.setDrawColor(200, 200, 200);
