@@ -407,12 +407,18 @@ Built with the vision of making AI-powered healthcare support more accessible, e
 
 ---
 
-# 📬 Contact
+## 👥 Team Members
 
-📧 your-email@example.com
+| Name | Role |
+|------|------|
+| **Mohammed Minul Islam** 🇧🇩 | Team Leader / Project Coordinator |
+| **Mir Mohammed Farhad** 🇧🇩 | Business Analyst / Data Scientist |
+| **Shamsul Huda Md Nahian** 🇧🇩 | UI/UX / Frontend Developer |
+| **Ammar Bin Manjur** 🇺🇸 | Presentation / Communication Lead |
 
 ---
 
-# ❤️ Final Vision
+# 📬 Contact
 
-“Technology should help patients before emergencies become tragedies.”
+📧 **minulislam7289@gmail.com**
+
