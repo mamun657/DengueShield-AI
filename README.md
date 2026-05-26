@@ -6,7 +6,7 @@
 ---
 
 <p align="center">
-  <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=600&size=24&pause=1000&color=00FFCC&center=true&vCenter=true&width=900&lines=🤖+AI+Smart+Doctor;🧠+RAG+%2B+GraphRAG+Clinical+Intelligence;🩺+AI+Rash+Detection;🏥+Emergency+Hospital+Support;🌍+Offline+Healthcare+Monitoring;📄+WHO+Aligned+Medical+Guidance" alt="Typing SVG" />
+  <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=600&size=24&pause=1000&color=00FFCC&center=true&vCenter=true&width=900&lines=🤖+AI+Smart+Doctor;🧠+RAG+%2B+GraphRAG+Clinical+Intelligence;🩺+Rash+Detection;🏥+Emergency+Hospital+Support;🌍+Offline+Healthcare+Monitoring;📄+WHO+Aligned+Medical+Guidance" alt="Typing SVG" />
 </p>
 
 ---
