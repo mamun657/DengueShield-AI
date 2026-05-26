@@ -1,127 +1,378 @@
-# DengueShield AI - Early Warning System
+# 🛡️ DengueShield AI
 
-Production-ready AI-native full-stack starter for dengue risk monitoring.
+> AI-Powered Dengue Monitoring, Clinical Intelligence & Emergency Support Platform
 
-## Architecture
+DengueShield AI is an intelligent healthcare platform designed to help patients monitor dengue symptoms, understand risk progression, receive AI-assisted medical guidance, and access emergency healthcare support in real time.
 
-1. **User Interaction Layer**: React + Tailwind frontend (`client`)
-2. **Application Logic Layer**: Express REST APIs (`server/src/routes`, `controllers`)
-3. **AI Intelligence Layer**: Rule-based risk + explainability (`server/src/services`)
-4. **Knowledge Retrieval Layer (RAG-ready)**: modular service boundary (`server/src/services`)
-5. **Data Layer**: MongoDB + Mongoose models (`server/src/models`)
-6. **Deployment-ready Infra**: env-driven config, security middleware, JWT auth
+The platform combines:
 
-Data flow: `input -> processing -> AI reasoning -> output -> feedback loop`
+- 🤖 AI Smart Doctor
+- 🧠 RAG + GraphRAG Clinical Intelligence
+- 📊 Real-time Risk Monitoring
+- 🩺 Rash Detection using CNN
+- 🌍 Offline Healthcare Support
+- 🏥 Nearby Hospital Finder
+- 📄 WHO-aligned Medical Guidance
+- 🌐 Bangla + English Communication
 
-## Folder Structure
+Our goal is to reduce delayed dengue treatment and improve early healthcare accessibility for both Bangladesh and global communities.
 
-```text
-DengueShield/
-  client/
-    src/
-      components/
-      context/
-      pages/
-      translations/
-      api.js
-      i18n.js
-  server/
-    src/
-      config/
-      controllers/
-      middleware/
-      models/
-      routes/
-      services/
-      app.js
-      server.js
-    .env.example
-```
+---
 
-## Core Features Implemented
+# 🚨 Why DengueShield AI?
 
-- JWT auth + role-based access (`admin`, `user`)
-- Daily symptom entry and historical tracking
-- 3/7 day trend analytics with charts
-- AI risk score (0-100) + risk level (Low/Medium/High/Critical)
-- Explainable AI reasoning output
-- Critical phase detection (day 3-7 + fever drop + warning signs)
-- AI doctor report generation (structured placeholder)
-- Rash image upload placeholder endpoint
-- Family shareable read-only dashboard
-- Nearby hospital finder (geolocation + Google Maps links)
-- Multi-language toggle (English/Bangla)
-- Admin dashboard for users, records, and high-risk monitoring
+Every year, millions of people worldwide are affected by dengue.
 
-## Backend API Routes
+Many patients fail to identify dangerous warning signs early, including:
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `GET /api/auth/me`
-- `GET /api/health/dashboard`
-- `POST /api/health/records`
-- `POST /api/health/records/:recordId/rash`
-- `POST /api/health/family/share-link`
-- `GET /api/health/family/:token`
-- `POST /api/reports`
-- `GET /api/reports`
-- `GET /api/admin/overview` (admin)
-- `GET /api/admin/users` (admin)
-- `GET /api/admin/records` (admin)
-- `GET /api/hospitals/nearby?lat=...&lng=...`
-- `POST /api/graphrag/analyze` — hybrid GraphRAG clinical intelligence
-- `GET /api/graphrag/graph` — knowledge graph visualization data
-- `GET /api/graphrag/health`
+- Persistent vomiting
+- Severe abdominal pain
+- Bleeding
+- Dehydration
+- Sudden fever drop
+- Extreme weakness
 
-## GraphRAG Clinical Intelligence
+In rural and low-resource areas, fast access to medical support is difficult.
 
-Enterprise GraphRAG layer: Neo4j WHO-aligned knowledge graph + XGBoost + RAG + Groq reasoning.
+DengueShield AI helps bridge this gap using AI-powered healthcare assistance and real-time monitoring.
 
-See **[docs/GRAPHRAG_ARCHITECTURE.md](docs/GRAPHRAG_ARCHITECTURE.md)** for setup, seeding, and API details.
+---
 
-```bash
-docker compose up neo4j -d
-cd server && npm run graph:seed
-```
+# ✨ Core Features
 
-UI: http://localhost:5173/graphrag
+---
 
-## Run Locally
+## 📊 AI Risk Monitoring Dashboard
 
-### 1) Backend
+Patients can track daily dengue symptoms and receive real-time AI risk evaluation.
 
-```bash
-cd server
-copy .env.example .env
-# Fill MONGODB_URI and JWT_SECRET
-npm install
-npm run dev
-```
+### Features
 
-### 2) Frontend
+- Daily symptom tracking
+- Fever progression monitoring
+- Risk score generation
+- Warning sign detection
+- WHO-based recommendations
+- Daily medical reports
+- Real-time risk updates
 
-```bash
-cd client
-npm install
-npm run dev
-```
+### Supported Inputs
 
-Frontend: `http://localhost:5173`  
-Backend: `http://localhost:5000`
+- Temperature
+- Vomiting
+- Bleeding
+- Rash
+- Fatigue
+- Abdominal pain
+- Fluid intake
+- Platelet count
+- Pregnancy status
+- Day of illness
 
-### 3) Docker Deployment
+📸 Add Dashboard Screenshot Here
 
-```bash
-docker compose up --build
-```
+---
 
-## Future AI Plug-ins
+## 🤖 AI Smart Doctor (RAG-Based)
 
-- XGBoost risk classifier replacement in `riskEngine`
-- SHAP explanation module
-- RAG retriever with WHO/vector DB integration
-- Gemini API integration for medical report generation
+DengueShield AI includes an intelligent Smart Doctor assistant.
 
-## Security Note
+Unlike normal chatbots, our Smart Doctor uses:
 
-Do not commit real database passwords or JWT secrets. Use environment variables only.
+- Retrieval Augmented Generation (RAG)
+- WHO dengue guidelines
+- Clinical medical references
+- Context-aware retrieval
+
+The system first retrieves trusted medical information before generating responses.
+
+This reduces hallucination and improves medical reliability.
+
+### Smart Doctor Capabilities
+
+- Bangla + English communication
+- Voice support
+- Symptom explanation
+- WHO warning sign guidance
+- Prevention advice
+- Emergency recommendations
+- Hydration guidance
+- Clinical care suggestions
+
+📸 Add Smart Doctor Screenshot Here
+
+---
+
+# 🧠 Clinical Intelligence (GraphRAG)
+
+One of the most advanced components of DengueShield AI is the Clinical Intelligence System.
+
+This module uses:
+
+- GraphRAG
+- Neo4j Knowledge Graph
+- WHO Clinical Logic
+- AI Clinical Reasoning
+
+Instead of only showing chatbot responses, the system creates relationships between:
+
+- Symptoms
+- Warning signs
+- Platelet conditions
+- Dehydration
+- Severe dengue pathways
+- Emergency risk factors
+
+The AI can visually explain how symptoms connect with severe dengue progression.
+
+### Example Clinical Flow
+
+Fever Drop → Dehydration → WHO Warning Sign → Hospital Observation
+
+This creates explainable medical intelligence rather than black-box AI predictions.
+
+📸 Add GraphRAG Screenshot Here
+
+---
+
+# 🩺 AI Rash Detection System
+
+Patients can upload skin rash images for AI analysis.
+
+The CNN-based image model analyzes dengue-related rash patterns and generates:
+
+- Dengue probability score
+- Clinical interpretation
+- Confidence level
+- AI heatmap visualization (Grad-CAM)
+
+The heatmap visually explains which areas influenced the AI prediction.
+
+This improves transparency and explainability.
+
+### Detection Modes
+
+✅ Possible Dengue Rash Detected  
+✅ Non-Dengue Rash Detection
+
+📸 Add Rash Detection Screenshot Here
+
+---
+
+# 🏥 Nearby Hospital Finder
+
+If a patient becomes high-risk or critical, DengueShield AI helps users quickly locate nearby hospitals.
+
+### Features
+
+- Real-time hospital search
+- Distance calculation
+- Google Maps integration
+- Emergency support navigation
+
+Patients can instantly open hospital directions using Maps.
+
+📸 Add Hospital Finder Screenshot Here
+
+---
+
+# 🚑 Emergency Patient Monitoring
+
+Healthcare admins can monitor patient conditions in real time.
+
+### Admin Capabilities
+
+- Monitor high-risk patients
+- Detect critical conditions
+- View patient risk scores
+- Track symptom progression
+- Send emergency instructions
+- Communicate directly with patients
+
+Patients can also send hospital admission requests during emergencies.
+
+This improves emergency response speed and patient coordination.
+
+📸 Add Admin Dashboard Screenshot Here
+
+---
+
+# 🌐 Offline Healthcare Support
+
+DengueShield AI supports offline operation for low-resource environments.
+
+This is especially important for:
+
+- Rural healthcare support
+- Low internet connectivity areas
+- Emergency field usage
+
+Core monitoring features remain accessible even with unstable internet connectivity.
+
+📸 Add Offline Mode Screenshot Here
+
+---
+
+# 📄 AI Medical Reports
+
+The platform automatically generates downloadable medical reports.
+
+Reports include:
+
+- Risk assessment
+- WHO warning signs
+- AI recommendations
+- Emergency guidance
+- Symptom summaries
+- Daily monitoring results
+
+📸 Add Medical Report Screenshot Here
+
+---
+
+# 🌍 Localization & Accessibility
+
+DengueShield AI was designed for accessibility and inclusiveness.
+
+### Supported Features
+
+- Bangla language support
+- English language support
+- Voice interaction
+- Simple healthcare UI
+- Rural-friendly workflow
+
+The platform is designed for both Bangladesh and global healthcare environments.
+
+---
+
+# 🛠️ Technology Stack
+
+## Frontend
+
+- React.js
+- Tailwind CSS
+- Recharts
+- Framer Motion
+
+## Backend
+
+- Node.js
+- Express.js
+- Python
+
+## AI & Machine Learning
+
+- RAG
+- GraphRAG
+- CNN Rash Detection
+- XGBoost Risk Prediction
+- Groq LLM Integration
+- WHO Knowledge Retrieval
+
+## Database & Infrastructure
+
+- MongoDB
+- Neo4j
+- Docker
+- REST API Architecture
+
+---
+
+# 🧬 AI Architecture
+
+## Smart Doctor Pipeline
+
+User Query  
+→ WHO Knowledge Retrieval  
+→ RAG Context Injection  
+→ AI Response Generation
+
+---
+
+## Clinical Intelligence Pipeline
+
+Symptoms  
+→ GraphRAG Analysis  
+→ WHO Clinical Mapping  
+→ Risk Evaluation  
+→ Medical Recommendation
+
+---
+
+## Rash Detection Pipeline
+
+Image Upload  
+→ CNN Analysis  
+→ Heatmap Generation  
+→ Confidence Scoring  
+→ Clinical Interpretation
+
+---
+
+# 📈 Potential Impact
+
+DengueShield AI aims to:
+
+- Improve early dengue detection
+- Reduce delayed hospitalization
+- Increase healthcare accessibility
+- Support rural healthcare systems
+- Improve patient monitoring
+- Assist overwhelmed healthcare providers
+
+---
+
+# 🔒 Responsible AI
+
+We prioritize safe and transparent AI usage.
+
+### Responsible AI Practices
+
+- WHO-aligned medical retrieval
+- Explainable AI heatmaps
+- Clinical reasoning visualization
+- Human-readable recommendations
+- Risk disclaimer system
+- AI does not replace doctors
+
+---
+
+# ⚠️ Disclaimer
+
+DengueShield AI is an AI-assisted healthcare support platform.
+
+It does not replace professional medical diagnosis or treatment.
+
+Patients should always consult licensed healthcare professionals for confirmed diagnosis and emergency care.
+
+---
+
+# 👨‍💻 Team Prohori
+
+Built with the vision of making AI-powered healthcare support more accessible, explainable, and scalable for Bangladesh and the world.
+
+---
+
+# 📬 Contact
+
+For collaboration, research, or healthcare partnerships:
+
+📧 your-email@example.com
+
+---
+
+# ⭐ Future Goals
+
+- IoT patient monitoring integration
+- National dengue surveillance
+- Mobile application release
+- Multi-disease AI support
+- Telemedicine integration
+- Real-time outbreak prediction
+
+---
+
+# ❤️ Built for Humanity
+
+“Technology should help people before emergencies become tragedies.”
