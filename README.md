@@ -6,9 +6,16 @@
 ---
 
 <p align="center">
-  <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=600&size=24&pause=1000&color=00D9FF&center=true&vCenter=true&width=900&lines=🤖+AI+Smart+Doctor;🧠+RAG+%2B+GraphRAG+Clinical+Intelligence;🩺+AI+Rash+Detection;🏥+Emergency+Hospital+Support;🌍+Offline+Healthcare+Monitoring;📄+WHO+Aligned+Medical+Guidance" alt="Typing SVG" />
+  <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=700&size=26&pause=1000&color=00FFCC&center=true&vCenter=true&width=950&lines=🤖+AI+Powered+Farming;🌾+Smart+Agriculture+Monitoring;📸+Crop+Disease+Detection;💹+AI+Market+Price+Prediction;🌦+Weather+%26+Irrigation+Insights;🎙+Bangla+Voice+Assistant;📊+Real-Time+Farmer+Analytics" alt="Typing SVG" />
 </p>
-
+---
+<p align="center">
+  <img src="https://img.shields.io/badge/AI-Agriculture-00FFCC?style=for-the-badge&logo=leaflet&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Crop%20Detection-CNN-green?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/Market%20Prediction-AI-blue?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/Voice%20Assistant-Bangla-orange?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/Offline-Supported-success?style=for-the-badge"/>
+</p>
 ---
 
 <p align="center">
