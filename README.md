@@ -20,6 +20,10 @@
 </p>
 
 ---
+🎥 Project Demo Video:
+https://www.youtube.com/watch?v=DIRNgydpPas
+
+---
 
 # 🌍 The Problem
 
@@ -253,8 +257,11 @@ Reports include:
 - AI recommendations
 - Emergency guidance
 - Monitoring history
-  
+- 
+
+
 <p align="center">
+    <img width="60%" height="505" alt="image" src="https://github.com/user-attachments/assets/cc64378c-fd0b-431b-9636-57e5ce55d2ec" />
   <img width="60%" height="500" src="https://github.com/user-attachments/assets/025d7757-452a-4277-a2f6-ab5909b8c475" />
   <img width="60%" height="500" src="https://github.com/user-attachments/assets/e690a809-4076-4b84-af17-a021e8bc7eac" />
 </p>
