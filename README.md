@@ -246,7 +246,9 @@ Reports include:
 - Emergency guidance
 - Monitoring history
 
-📸 Add Report Screenshot Here
+<img width="1759" height="747" alt="image" src="https://github.com/user-attachments/assets/7ca59f33-1ed0-4b95-a119-e52193f259e1" /><img width="1919" height="865" alt="image" src="https://github.com/user-attachments/assets/39f6ffb5-8ac1-416a-8941-a688aab2594c" />
+
+
 
 ---
 
@@ -412,13 +414,14 @@ Built with the vision of making AI-powered healthcare support more accessible, e
 | Name | Role |
 |------|------|
 | **Mohammed Minul Islam** (🇧🇩) | Team Leader / Project Coordinator |
-| **Mir Mohammed Farhad** 🇧🇩 | Business Analyst / Data Scientist |
-| **Shamsul Huda Md Nahian** 🇧🇩 | UI/UX / Frontend Developer |
-| **Ammar Bin Manjur** 🇺🇸 | Presentation / Communication Lead |
+| **Mir Mohammed Farhad** (🇧🇩) | Business Analyst / Data Scientist |
+| **Shamsul Huda Md Nahian** (🇧🇩) | UI/UX / Frontend Developer |
+| **Ammar Bin Manjur** (🇺🇸) | Presentation / Communication Lead |
 
 ---
 
 # 📬 Contact
 
 📧 **minulislam7289@gmail.com**
+📱 **+8801874379798**
 
