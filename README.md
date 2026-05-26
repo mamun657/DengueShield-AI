@@ -1,29 +1,31 @@
-# 🛡️ DengueShield AI
+<!-- Project Header -->
 
-> AI-Powered Dengue Monitoring, Clinical Intelligence & Emergency Support Platform
-
-DengueShield AI is an intelligent healthcare platform designed to help patients monitor dengue symptoms, understand risk progression, receive AI-assisted medical guidance, and access emergency healthcare support in real time.
-
-The platform combines:
-
-- 🤖 AI Smart Doctor
-- 🧠 RAG + GraphRAG Clinical Intelligence
-- 📊 Real-time Risk Monitoring
-- 🩺 Rash Detection using CNN
-- 🌍 Offline Healthcare Support
-- 🏥 Nearby Hospital Finder
-- 📄 WHO-aligned Medical Guidance
-- 🌐 Bangla + English Communication
-
-Our goal is to reduce delayed dengue treatment and improve early healthcare accessibility for both Bangladesh and global communities.
+<h1 align="center">🛡️ DengueShield AI</h1>
+<h2 align="center">AI-Powered Dengue Monitoring & Clinical Intelligence Platform</h2>
 
 ---
 
-# 🚨 Why DengueShield AI?
+<p align="center">
+  <img src="https://readme-typing-svg.herokuapp.com?font=Fira+Code&weight=600&size=24&pause=1000&color=00D9FF&center=true&vCenter=true&width=900&lines=🤖+AI+Smart+Doctor;🧠+RAG+%2B+GraphRAG+Clinical+Intelligence;🩺+AI+Rash+Detection;🏥+Emergency+Hospital+Support;🌍+Offline+Healthcare+Monitoring;📄+WHO+Aligned+Medical+Guidance" alt="Typing SVG" />
+</p>
 
-Every year, millions of people worldwide are affected by dengue.
+---
 
-Many patients fail to identify dangerous warning signs early, including:
+<p align="center">
+  <img src="https://img.shields.io/badge/AI-Healthcare-blue?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/RAG-WHO%20Guidelines-green?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/GraphRAG-Clinical%20Reasoning-orange?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/Offline-Supported-success?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/Bangla-English-red?style=for-the-badge"/>
+</p>
+
+---
+
+# 🌍 The Problem
+
+Every year, millions of people around the world are affected by dengue fever.
+
+In Bangladesh and many developing countries, patients often fail to identify dangerous warning signs early, including:
 
 - Persistent vomiting
 - Severe abdominal pain
@@ -32,29 +34,53 @@ Many patients fail to identify dangerous warning signs early, including:
 - Sudden fever drop
 - Extreme weakness
 
-In rural and low-resource areas, fast access to medical support is difficult.
+Because of delayed action and limited healthcare accessibility, many patients become critical before reaching hospitals.
 
-DengueShield AI helps bridge this gap using AI-powered healthcare assistance and real-time monitoring.
+In rural and low-resource areas, getting fast medical support is even more difficult.
 
 ---
 
-# ✨ Core Features
+# 💡 Our Solution
+
+## 🛡️ DengueShield AI
+
+DengueShield AI is an intelligent healthcare platform designed to help patients:
+
+- Monitor dengue symptoms daily
+- Understand dengue risk progression
+- Receive AI-assisted medical guidance
+- Detect dengue-related rash patterns
+- Access emergency healthcare support
+- Find nearby hospitals instantly
+
+The platform combines:
+
+- 🤖 AI Smart Doctor
+- 🧠 RAG + GraphRAG
+- 📊 Real-time Risk Monitoring
+- 🩺 CNN Rash Detection
+- 🌍 Offline Healthcare Support
+- 📄 WHO-aligned Clinical Guidance
+
+---
+
+# ✨ Key Features
 
 ---
 
 ## 📊 AI Risk Monitoring Dashboard
 
-Patients can track daily dengue symptoms and receive real-time AI risk evaluation.
+Patients can monitor symptoms and track dengue risk progression in real time.
 
 ### Features
 
 - Daily symptom tracking
-- Fever progression monitoring
+- Fever monitoring
 - Risk score generation
-- Warning sign detection
-- WHO-based recommendations
-- Daily medical reports
-- Real-time risk updates
+- WHO warning sign detection
+- Risk trend visualization
+- Medical recommendations
+- Downloadable reports
 
 ### Supported Inputs
 
@@ -64,10 +90,9 @@ Patients can track daily dengue symptoms and receive real-time AI risk evaluatio
 - Rash
 - Fatigue
 - Abdominal pain
-- Fluid intake
 - Platelet count
+- Fluid intake
 - Pregnancy status
-- Day of illness
 
 📸 Add Dashboard Screenshot Here
 
@@ -75,29 +100,27 @@ Patients can track daily dengue symptoms and receive real-time AI risk evaluatio
 
 ## 🤖 AI Smart Doctor (RAG-Based)
 
-DengueShield AI includes an intelligent Smart Doctor assistant.
+The AI Smart Doctor helps patients understand symptoms using trusted medical knowledge.
 
 Unlike normal chatbots, our Smart Doctor uses:
 
 - Retrieval Augmented Generation (RAG)
 - WHO dengue guidelines
 - Clinical medical references
-- Context-aware retrieval
+- Context-aware retrieval system
 
-The system first retrieves trusted medical information before generating responses.
+The AI first retrieves trusted medical information before generating responses.
 
-This reduces hallucination and improves medical reliability.
+This significantly reduces hallucination and improves reliability.
 
-### Smart Doctor Capabilities
+### Features
 
-- Bangla + English communication
-- Voice support
+- Bangla + English support
+- Voice interaction
 - Symptom explanation
-- WHO warning sign guidance
-- Prevention advice
-- Emergency recommendations
-- Hydration guidance
-- Clinical care suggestions
+- Dengue warning sign guidance
+- Prevention recommendations
+- Emergency suggestions
 
 📸 Add Smart Doctor Screenshot Here
 
@@ -118,18 +141,20 @@ Instead of only showing chatbot responses, the system creates relationships betw
 
 - Symptoms
 - Warning signs
+- Dehydration risk
 - Platelet conditions
-- Dehydration
 - Severe dengue pathways
-- Emergency risk factors
+- Emergency escalation logic
 
-The AI can visually explain how symptoms connect with severe dengue progression.
+### Example Flow
 
-### Example Clinical Flow
+Fever Drop  
+→ Dehydration  
+→ WHO Warning Sign  
+→ Severe Dengue Risk  
+→ Hospital Observation
 
-Fever Drop → Dehydration → WHO Warning Sign → Hospital Observation
-
-This creates explainable medical intelligence rather than black-box AI predictions.
+This creates explainable medical intelligence instead of black-box AI predictions.
 
 📸 Add GraphRAG Screenshot Here
 
@@ -139,16 +164,14 @@ This creates explainable medical intelligence rather than black-box AI predictio
 
 Patients can upload skin rash images for AI analysis.
 
-The CNN-based image model analyzes dengue-related rash patterns and generates:
+The CNN-based image model analyzes dengue-related skin patterns and generates:
 
 - Dengue probability score
+- Confidence percentage
 - Clinical interpretation
-- Confidence level
-- AI heatmap visualization (Grad-CAM)
+- AI attention heatmap (Grad-CAM)
 
-The heatmap visually explains which areas influenced the AI prediction.
-
-This improves transparency and explainability.
+The heatmap visually explains which image areas influenced the AI prediction.
 
 ### Detection Modes
 
@@ -161,16 +184,14 @@ This improves transparency and explainability.
 
 # 🏥 Nearby Hospital Finder
 
-If a patient becomes high-risk or critical, DengueShield AI helps users quickly locate nearby hospitals.
+If a patient becomes high-risk or critical, DengueShield AI instantly helps users locate nearby hospitals.
 
 ### Features
 
 - Real-time hospital search
 - Distance calculation
 - Google Maps integration
-- Emergency support navigation
-
-Patients can instantly open hospital directions using Maps.
+- Emergency navigation support
 
 📸 Add Hospital Finder Screenshot Here
 
@@ -178,20 +199,18 @@ Patients can instantly open hospital directions using Maps.
 
 # 🚑 Emergency Patient Monitoring
 
-Healthcare admins can monitor patient conditions in real time.
+Healthcare admins can monitor high-risk patients in real time.
 
-### Admin Capabilities
+### Admin Features
 
-- Monitor high-risk patients
-- Detect critical conditions
-- View patient risk scores
-- Track symptom progression
-- Send emergency instructions
-- Communicate directly with patients
+- High-risk patient monitoring
+- Critical patient alerts
+- Real-time risk tracking
+- Patient communication system
+- Emergency messaging
+- Admission request handling
 
-Patients can also send hospital admission requests during emergencies.
-
-This improves emergency response speed and patient coordination.
+If a patient becomes critical, healthcare admins can instantly send emergency instructions and advise hospital admission.
 
 📸 Add Admin Dashboard Screenshot Here
 
@@ -199,15 +218,16 @@ This improves emergency response speed and patient coordination.
 
 # 🌐 Offline Healthcare Support
 
-DengueShield AI supports offline operation for low-resource environments.
+DengueShield AI supports offline functionality for low-resource environments.
 
 This is especially important for:
 
 - Rural healthcare support
-- Low internet connectivity areas
-- Emergency field usage
+- Low internet areas
+- Emergency situations
+- Remote monitoring
 
-Core monitoring features remain accessible even with unstable internet connectivity.
+Core monitoring features remain accessible even without stable internet connectivity.
 
 📸 Add Offline Mode Screenshot Here
 
@@ -221,12 +241,12 @@ Reports include:
 
 - Risk assessment
 - WHO warning signs
+- Symptom summaries
 - AI recommendations
 - Emergency guidance
-- Symptom summaries
-- Daily monitoring results
+- Monitoring history
 
-📸 Add Medical Report Screenshot Here
+📸 Add Report Screenshot Here
 
 ---
 
@@ -267,7 +287,7 @@ The platform is designed for both Bangladesh and global healthcare environments.
 - GraphRAG
 - CNN Rash Detection
 - XGBoost Risk Prediction
-- Groq LLM Integration
+- Groq LLM
 - WHO Knowledge Retrieval
 
 ## Database & Infrastructure
@@ -296,7 +316,7 @@ Symptoms
 → GraphRAG Analysis  
 → WHO Clinical Mapping  
 → Risk Evaluation  
-→ Medical Recommendation
+→ AI Recommendation
 
 ---
 
@@ -304,9 +324,21 @@ Symptoms
 
 Image Upload  
 → CNN Analysis  
-→ Heatmap Generation  
+→ Grad-CAM Heatmap  
 → Confidence Scoring  
 → Clinical Interpretation
+
+---
+
+# 📱 System Workflow
+
+1. Patient enters symptoms
+2. AI evaluates dengue risk
+3. Smart Doctor retrieves WHO medical knowledge
+4. Clinical Intelligence analyzes symptom relationships
+5. Rash Detection checks skin patterns
+6. System generates risk score & recommendations
+7. Nearby hospitals suggested if emergency detected
 
 ---
 
@@ -318,33 +350,54 @@ DengueShield AI aims to:
 - Reduce delayed hospitalization
 - Increase healthcare accessibility
 - Support rural healthcare systems
-- Improve patient monitoring
-- Assist overwhelmed healthcare providers
+- Improve emergency response
+- Assist healthcare providers
 
 ---
 
 # 🔒 Responsible AI
 
-We prioritize safe and transparent AI usage.
+We prioritize safe and transparent AI practices.
 
-### Responsible AI Practices
+### Responsible AI Features
 
-- WHO-aligned medical retrieval
+- WHO-aligned retrieval
 - Explainable AI heatmaps
 - Clinical reasoning visualization
-- Human-readable recommendations
-- Risk disclaimer system
-- AI does not replace doctors
+- Transparent recommendations
+- Risk disclaimers
+- Human-centered healthcare support
+
+⚠️ The system does NOT replace professional doctors.
 
 ---
 
-# ⚠️ Disclaimer
+# 🌍 SDG Alignment
 
-DengueShield AI is an AI-assisted healthcare support platform.
+## 🩺 Primary Goal
 
-It does not replace professional medical diagnosis or treatment.
+### SDG 03 — Good Health & Well-being
 
-Patients should always consult licensed healthcare professionals for confirmed diagnosis and emergency care.
+- Improves early healthcare support
+- Assists dengue monitoring
+- Encourages faster treatment access
+
+## Supporting Goals
+
+- 🌍 SDG 09 — Industry, Innovation & Infrastructure
+- 🤖 SDG 10 — Reduced Inequalities
+- 🏥 SDG 11 — Sustainable Communities
+
+---
+
+# 🚀 Future Improvements
+
+- IoT health monitoring
+- Mobile application
+- National dengue surveillance
+- Multi-disease support
+- Telemedicine integration
+- Real-time outbreak prediction
 
 ---
 
@@ -356,23 +409,10 @@ Built with the vision of making AI-powered healthcare support more accessible, e
 
 # 📬 Contact
 
-For collaboration, research, or healthcare partnerships:
-
 📧 your-email@example.com
 
 ---
 
-# ⭐ Future Goals
+# ❤️ Final Vision
 
-- IoT patient monitoring integration
-- National dengue surveillance
-- Mobile application release
-- Multi-disease AI support
-- Telemedicine integration
-- Real-time outbreak prediction
-
----
-
-# ❤️ Built for Humanity
-
-“Technology should help people before emergencies become tragedies.”
+“Technology should help patients before emergencies become tragedies.”
