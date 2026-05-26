@@ -94,7 +94,10 @@ Patients can monitor symptoms and track dengue risk progression in real time.
 - Fluid intake
 - Pregnancy status
 
-📸 Add Dashboard Screenshot Here
+<p align="center">
+  <img width="60%" height="500" src="https://github.com/user-attachments/assets/7ca59f33-1ed0-4b95-a119-e52193f259e1" />
+  <img width="60%" height="500" src="https://github.com/user-attachments/assets/39f6ffb5-8ac1-416a-8941-a688aab2594c" />
+</p>
 
 ---
 
@@ -122,7 +125,12 @@ This significantly reduces hallucination and improves reliability.
 - Prevention recommendations
 - Emergency suggestions
 
-📸 Add Smart Doctor Screenshot Here
+<p align="center">
+  <img width="60%" height="500" src="https://github.com/user-attachments/assets/86d17e76-fa4c-4795-b131-25668998b4be" />
+  <img width="60%" height="500" src="https://github.com/user-attachments/assets/11d20a3b-be56-4f87-8ac8-02e325e450c2" />
+</p>
+
+
 
 ---
 
@@ -156,11 +164,16 @@ Fever Drop
 
 This creates explainable medical intelligence instead of black-box AI predictions.
 
-📸 Add GraphRAG Screenshot Here
+<p align="center">
+  <img width="60%" height="500" src="https://github.com/user-attachments/assets/099c558c-4a0b-44e1-aaed-597b13a23a65" />
+  <img width="60%" height="500" src="https://github.com/user-attachments/assets/9ed35f57-0651-43a4-99e2-0dbbc632dff6" />
+</p>
+
+
 
 ---
 
-# 🩺 AI Rash Detection System
+# 🩺 Rash Detection System
 
 Patients can upload skin rash images for AI analysis.
 
@@ -178,7 +191,12 @@ The heatmap visually explains which image areas influenced the AI prediction.
 ✅ Possible Dengue Rash Detected  
 ✅ Non-Dengue Rash Detection
 
-📸 Add Rash Detection Screenshot Here
+<p align="center">
+  <img width="60%" height="500" src="https://github.com/user-attachments/assets/d8d7b5cf-9148-43db-99d9-5037cbbd61ba" />
+  <img width="60%" height="500" src="https://github.com/user-attachments/assets/7252d749-8f23-4778-b859-b3271b2e6cc6" />
+</p>
+
+
 
 ---
 
@@ -193,7 +211,8 @@ If a patient becomes high-risk or critical, DengueShield AI instantly helps user
 - Google Maps integration
 - Emergency navigation support
 
-📸 Add Hospital Finder Screenshot Here
+<img width="1595" height="566" alt="image" src="https://github.com/user-attachments/assets/3ea96506-2458-4b37-ae9f-f10cfa3c519c" />
+
 
 ---
 
@@ -212,26 +231,15 @@ Healthcare admins can monitor high-risk patients in real time.
 
 If a patient becomes critical, healthcare admins can instantly send emergency instructions and advise hospital admission.
 
-📸 Add Admin Dashboard Screenshot Here
+<p align="center">
+  <img width="60%" height="500" src="https://github.com/user-attachments/assets/2e8ee6ab-5fc7-480a-aaa5-82be1b39c307" />
+  <img width="60%" height="500" src="https://github.com/user-attachments/assets/7cf94db8-58b6-4c0c-a048-976787442fdd" />
+</p>
+
+
 
 ---
 
-# 🌐 Offline Healthcare Support
-
-DengueShield AI supports offline functionality for low-resource environments.
-
-This is especially important for:
-
-- Rural healthcare support
-- Low internet areas
-- Emergency situations
-- Remote monitoring
-
-Core monitoring features remain accessible even without stable internet connectivity.
-
-📸 Add Offline Mode Screenshot Here
-
----
 
 # 📄 AI Medical Reports
 
@@ -245,9 +253,25 @@ Reports include:
 - AI recommendations
 - Emergency guidance
 - Monitoring history
+  
+<p align="center">
+  <img width="60%" height="500" src="https://github.com/user-attachments/assets/025d7757-452a-4277-a2f6-ab5909b8c475" />
+  <img width="60%" height="500" src="https://github.com/user-attachments/assets/e690a809-4076-4b84-af17-a021e8bc7eac" />
+</p>
 
-<img width="1759" height="747" alt="image" src="https://github.com/user-attachments/assets/7ca59f33-1ed0-4b95-a119-e52193f259e1" /><img width="1919" height="865" alt="image" src="https://github.com/user-attachments/assets/39f6ffb5-8ac1-416a-8941-a688aab2594c" />
+---
+# 🌐 Offline Healthcare Support
 
+DengueShield AI supports offline functionality for low-resource environments.
+
+This is especially important for:
+
+- Rural healthcare support
+- Low internet areas
+- Emergency situations
+- Remote monitoring
+
+Core monitoring features remain accessible even without stable internet connectivity.
 
 
 ---
