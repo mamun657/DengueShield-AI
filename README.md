@@ -12,21 +12,12 @@
 ---
 
 <p align="center">
-  <img src="https://img.shields.io/badge/AI-Agriculture-00FFCC?style=for-the-badge&logo=leaflet&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Crop%20Detection-CNN-green?style=for-the-badge"/>
-  <img src="https://img.shields.io/badge/Market%20Prediction-AI-blue?style=for-the-badge"/>
-  <img src="https://img.shields.io/badge/Voice%20Assistant-Bangla-orange?style=for-the-badge"/>
-  <img src="https://img.shields.io/badge/Offline-Supported-success?style=for-the-badge"/>
-</p>
-
-<p align="center">
   <img src="https://img.shields.io/badge/AI-Healthcare-blue?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/RAG-WHO%20Guidelines-green?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/GraphRAG-Clinical%20Reasoning-orange?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/Offline-Supported-success?style=for-the-badge"/>
   <img src="https://img.shields.io/badge/Bangla-English-red?style=for-the-badge"/>
 </p>
-
 ---
 
 # 🌍 The Problem
