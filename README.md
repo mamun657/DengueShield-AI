@@ -264,7 +264,7 @@ Reports include:
 - AI recommendations
 - Emergency guidance
 - Monitoring history
-- 
+  
 
 
 <p align="center">
