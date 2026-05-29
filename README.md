@@ -432,8 +432,6 @@ We prioritize safe and transparent AI practices.
 
 # 🚀 Future Improvements
 
-- IoT health monitoring
-- Mobile application
 - National dengue surveillance
 - Multi-disease support
 - Telemedicine integration
