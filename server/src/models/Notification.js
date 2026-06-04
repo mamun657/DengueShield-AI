@@ -5,7 +5,16 @@ const NotificationSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     type: {
       type: String,
-      enum: ["message", "critical_alert", "admin_reply", "emergency", "high_risk"],
+      enum: [
+        "message",
+        "critical_alert",
+        "admin_reply",
+        "emergency",
+        "high_risk",
+        "critical_patient",
+        "patient_risk_warning",
+        "patient_critical_alert",
+      ],
       default: "message",
     },
     title: { type: String, required: true },

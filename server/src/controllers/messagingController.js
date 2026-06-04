@@ -139,28 +139,39 @@ const listNotifications = async (req, res) => {
       .limit(50)
       .lean();
 
-    const unreadCount = await Notification.countDocuments({
-      userId: req.user._id,
-      read: false,
-    });
-
-    const conversations = await Conversation.find(
-      req.user.role === "admin" ? { adminId: req.user._id } : { patientId: req.user._id }
-    ).lean();
-
-    const messageUnread = conversations.reduce((sum, c) => {
-      return sum + (req.user.role === "admin" ? c.unreadForAdmin : c.unreadForPatient);
-    }, 0);
+    const counts = await countUnreadForUser(req.user);
 
     return res.json({
       success: true,
       notifications,
-      unreadCount: Math.max(unreadCount, messageUnread),
-      messageUnread,
+      unreadCount: counts.unreadCount,
+      messageUnread: counts.messageUnread,
+      notificationUnread: counts.notificationUnread,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
+};
+
+const countUnreadForUser = async (user) => {
+  const notificationUnread = await Notification.countDocuments({
+    userId: user._id,
+    read: false,
+  });
+
+  const conversations = await Conversation.find(
+    user.role === "admin" ? { adminId: user._id } : { patientId: user._id }
+  ).lean();
+
+  const messageUnread = conversations.reduce((sum, c) => {
+    return sum + (user.role === "admin" ? c.unreadForAdmin : c.unreadForPatient);
+  }, 0);
+
+  return {
+    notificationUnread,
+    messageUnread,
+    unreadCount: Math.max(notificationUnread, messageUnread),
+  };
 };
 
 const markNotificationsRead = async (req, res) => {
@@ -173,7 +184,20 @@ const markNotificationsRead = async (req, res) => {
     }
 
     await Notification.updateMany(filter, { $set: { read: true } });
-    return res.json({ success: true });
+
+    const counts = await countUnreadForUser(req.user);
+    const io = getSocketIo(req);
+    const markedIds = Array.isArray(notificationIds) ? notificationIds : [];
+
+    if (io) {
+      io.to(`user:${req.user._id}`).emit("notification_read", {
+        notificationIds: markedIds,
+        unreadCount: counts.unreadCount,
+        userId: String(req.user._id),
+      });
+    }
+
+    return res.json({ success: true, ...counts });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

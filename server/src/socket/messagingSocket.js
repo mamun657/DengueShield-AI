@@ -1,6 +1,25 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Notification = require("../models/Notification");
+const Conversation = require("../models/Conversation");
 const { sendMessage } = require("../services/messagingService");
+
+const countUnreadForUser = async (user) => {
+  const notificationUnread = await Notification.countDocuments({
+    userId: user._id,
+    read: false,
+  });
+
+  const conversations = await Conversation.find(
+    user.role === "admin" ? { adminId: user._id } : { patientId: user._id }
+  ).lean();
+
+  const messageUnread = conversations.reduce((sum, c) => {
+    return sum + (user.role === "admin" ? c.unreadForAdmin : c.unreadForPatient);
+  }, 0);
+
+  return Math.max(notificationUnread, messageUnread);
+};
 
 const initMessagingSocket = (io) => {
   io.use(async (socket, next) => {
@@ -54,6 +73,33 @@ const initMessagingSocket = (io) => {
         userName: socket.user.name,
         isTyping: Boolean(isTyping),
       });
+    });
+
+    socket.on("notification_read", async (payload) => {
+      try {
+        const { notificationId, notificationIds } = payload || {};
+        const ids = [
+          ...(notificationId ? [notificationId] : []),
+          ...(Array.isArray(notificationIds) ? notificationIds : []),
+        ].filter(Boolean);
+
+        if (!ids.length) return;
+
+        await Notification.updateMany(
+          { _id: { $in: ids }, userId: socket.user._id, read: false },
+          { $set: { read: true } }
+        );
+
+        const unreadCount = await countUnreadForUser(socket.user);
+
+        io.to(`user:${userId}`).emit("notification_read", {
+          notificationIds: ids.map(String),
+          unreadCount,
+          userId,
+        });
+      } catch (error) {
+        console.warn("[Socket] notification_read failed:", error.message);
+      }
     });
 
     socket.on("disconnect", () => {

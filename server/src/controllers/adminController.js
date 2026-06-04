@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const HealthRecord = require("../models/HealthRecord");
 const Report = require("../models/Report");
+const CriticalAlert = require("../models/CriticalAlert");
 
 const getAdminOverview = async (_req, res) => {
   const [totalUsers, totalRecords, riskCounts] = await Promise.all([
@@ -179,9 +180,61 @@ const markRecordRecovered = async (req, res) => {
   return res.json({ message: "Record marked recovered" });
 };
 
+/**
+ * Active critical patients flagged by the Critical Patient Agent (unresolved alerts).
+ */
+const getCriticalPatientAlerts = async (_req, res) => {
+  const alerts = await CriticalAlert.find({
+    classification: "critical",
+    resolved: false,
+  })
+    .populate("patientId", "name email")
+    .sort({ riskScore: -1, createdAt: -1 })
+    .limit(24)
+    .lean();
+
+  return res.json(
+    alerts.map((alert) => {
+      const trendScores = (alert.riskTrend || []).map((entry) => entry.riskScore);
+      const trendLabel = trendScores.length ? trendScores.join(" → ") : String(alert.riskScore);
+
+      return {
+        id: alert._id,
+        patientId: alert.patientId?._id || alert.patientId,
+        patientName: alert.patientId?.name || "Unknown",
+        patientEmail: alert.patientId?.email || "",
+        riskScore: alert.riskScore,
+        riskTrend: alert.riskTrend || [],
+        riskTrendLabel: trendLabel,
+        warningSigns: alert.warningSigns || [],
+        recommendedAction: alert.recommendedAction || "Immediate Clinical Follow-up",
+        status: "CRITICAL",
+        timestamp: alert.createdAt,
+        healthRecordId: alert.healthRecordId,
+        decisionReasons: alert.decisionReasons || [],
+      };
+    })
+  );
+};
+
+const resolveCriticalPatientAlert = async (req, res) => {
+  const alert = await CriticalAlert.findById(req.params.id);
+  if (!alert) return res.status(404).json({ message: "Critical alert not found" });
+
+  alert.resolved = true;
+  alert.resolvedAt = new Date();
+  alert.resolvedBy = req.user?._id || null;
+  alert.status = "resolved";
+  await alert.save();
+
+  return res.json({ message: "Critical alert resolved", alert });
+};
+
 module.exports = {
   getAdminOverview,
   getAdminAlerts,
+  getCriticalPatientAlerts,
+  resolveCriticalPatientAlert,
   getAllUsers,
   getAllHealthRecords,
   updateUserByAdmin,

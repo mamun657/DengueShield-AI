@@ -8,11 +8,15 @@ import {
   fetchNotifications,
   fetchPatientConversation,
   markConversationRead,
+  markNotificationsRead,
   openConversationWithPatient,
   sendMessage as sendMessageApi,
 } from "../api/messagingApi";
 
 const MessagingContext = createContext(null);
+const SOCKET_SEND_TIMEOUT_MS = 12000;
+const REFRESH_DEBOUNCE_MS = 2000;
+const POLL_INTERVAL_MS = 30000;
 
 export const MessagingProvider = ({ children }) => {
   const { user } = useAuth();
@@ -28,8 +32,19 @@ export const MessagingProvider = ({ children }) => {
   const socketRef = useRef(null);
   const typingTimerRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const activeConversationRef = useRef(null);
+  const refreshTimerRef = useRef(null);
+  const isPanelOpenRef = useRef(false);
 
   const isAdmin = String(user?.role || "").toLowerCase() === "admin";
+
+  useEffect(() => {
+    activeConversationRef.current = activeConversation;
+  }, [activeConversation]);
+
+  useEffect(() => {
+    isPanelOpenRef.current = isPanelOpen;
+  }, [isPanelOpen]);
 
   const refreshNotifications = useCallback(async () => {
     if (!user) return;
@@ -38,7 +53,10 @@ export const MessagingProvider = ({ children }) => {
       setNotifications(res.data?.notifications || []);
       setUnreadCount(Number(res.data?.unreadCount || 0));
     } catch (error) {
-      console.warn("[Messaging] notifications refresh failed", error.message);
+      const status = error?.response?.status;
+      if (status !== 429) {
+        console.warn("[Messaging] notifications refresh failed", error.message);
+      }
     }
   }, [user]);
 
@@ -48,26 +66,97 @@ export const MessagingProvider = ({ children }) => {
       const res = await fetchConversations();
       setConversations(res.data?.conversations || []);
     } catch (error) {
-      console.warn("[Messaging] conversations refresh failed", error.message);
+      const status = error?.response?.status;
+      if (status !== 429) {
+        console.warn("[Messaging] conversations refresh failed", error.message);
+      }
     }
   }, [user]);
 
-  const loadMessages = useCallback(async (conversationId) => {
-    if (!conversationId) return;
-    const res = await fetchMessages(conversationId);
-    setMessages(res.data?.messages || []);
-    if (res.data?.conversation) {
-      setActiveConversation(res.data.conversation);
-    }
-    await markConversationRead(conversationId);
-    await refreshNotifications();
-    await refreshConversations();
+  const scheduleBackgroundRefresh = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      refreshNotifications();
+      refreshConversations();
+    }, REFRESH_DEBOUNCE_MS);
   }, [refreshConversations, refreshNotifications]);
 
+  const markNotificationAsRead = useCallback(
+    async (notificationId) => {
+      if (!notificationId || !user) return;
+
+      const target = notifications.find((n) => String(n._id) === String(notificationId));
+      const wasUnread = Boolean(target && !target.read);
+
+      if (wasUnread) {
+        setNotifications((prev) =>
+          prev.map((n) =>
+            String(n._id) === String(notificationId) ? { ...n, read: true } : n
+          )
+        );
+        setUnreadCount((count) => Math.max(0, count - 1));
+      }
+
+      try {
+        const res = await markNotificationsRead([notificationId]);
+        if (res.data?.unreadCount != null) {
+          setUnreadCount(Number(res.data.unreadCount));
+        }
+      } catch (error) {
+        console.warn("[Messaging] mark notification read failed", error.message);
+        scheduleBackgroundRefresh();
+        return;
+      }
+
+      setNotifications((prev) =>
+        prev.map((n) =>
+          String(n._id) === String(notificationId) ? { ...n, read: true } : n
+        )
+      );
+    },
+    [user, notifications, scheduleBackgroundRefresh]
+  );
+
+  const applyNotificationReadSync = useCallback((payload) => {
+    const myId = user?.id || user?._id;
+    if (payload?.userId && String(payload.userId) !== String(myId)) return;
+
+    const ids = (payload?.notificationIds || []).map(String);
+    if (ids.length) {
+      setNotifications((prev) =>
+        prev.map((n) => (ids.includes(String(n._id)) ? { ...n, read: true } : n))
+      );
+    }
+
+    if (payload?.unreadCount != null) {
+      setUnreadCount(Number(payload.unreadCount));
+    }
+  }, [user]);
+
+  const loadMessages = useCallback(
+    async (conversationId) => {
+      if (!conversationId) return;
+      try {
+        const res = await fetchMessages(conversationId);
+        setMessages(res.data?.messages || []);
+        if (res.data?.conversation) {
+          setActiveConversation(res.data.conversation);
+        }
+        await markConversationRead(conversationId);
+        scheduleBackgroundRefresh();
+      } catch (error) {
+        console.error("[Messaging] load messages failed", error.message);
+        throw error;
+      }
+    },
+    [scheduleBackgroundRefresh]
+  );
+
   const openChat = useCallback(
-    async ({ conversation, conversationId, patientId, patientName } = {}) => {
+    async ({ conversation, conversationId, patientId } = {}) => {
       if (!user) return;
       setIsPanelOpen(true);
+      setIsSending(false);
       try {
         if (conversation) {
           setActiveConversation(conversation);
@@ -101,60 +190,91 @@ export const MessagingProvider = ({ children }) => {
   const closePanel = useCallback(() => {
     setIsPanelOpen(false);
     setTypingUser("");
+    setIsSending(false);
+  }, []);
+
+  const appendMessage = useCallback((message) => {
+    if (!message?._id) return;
+    setMessages((prev) => {
+      const exists = prev.some((m) => String(m._id) === String(message._id));
+      return exists ? prev : [...prev, message];
+    });
   }, []);
 
   const sendMessage = useCallback(
     async (text) => {
       const trimmed = String(text || "").trim();
-      if (!trimmed || !activeConversation) return;
+      const conversation = activeConversationRef.current;
+      if (!trimmed || !conversation?._id) {
+        throw new Error("Conversation is not ready. Close and reopen chat.");
+      }
 
       setIsSending(true);
       const peerId = isAdmin
-        ? activeConversation.patientId?._id || activeConversation.patientId
-        : activeConversation.adminId?._id || activeConversation.adminId;
+        ? conversation.patientId?._id || conversation.patientId
+        : conversation.adminId?._id || conversation.adminId;
 
       try {
         if (socketRef.current?.connected) {
-          await new Promise((resolve, reject) => {
-            socketRef.current.emit(
-              "send_message",
-              { receiverId: peerId, text: trimmed },
-              (ack) => {
-                if (ack?.success) resolve(ack);
-                else reject(new Error(ack?.message || "Socket send failed"));
-              }
-            );
-          });
+          const ack = await Promise.race([
+            new Promise((resolve, reject) => {
+              socketRef.current.emit(
+                "send_message",
+                { receiverId: peerId, text: trimmed },
+                (response) => {
+                  if (response?.success) resolve(response);
+                  else reject(new Error(response?.message || "Socket send failed"));
+                }
+              );
+            }),
+            new Promise((_, reject) => {
+              setTimeout(
+                () => reject(new Error("Message send timed out. Please try again.")),
+                SOCKET_SEND_TIMEOUT_MS
+              );
+            }),
+          ]);
+
+          if (ack?.message) {
+            appendMessage(ack.message);
+          }
+          if (ack?.conversation) {
+            setActiveConversation(ack.conversation);
+            setConversations((prev) => {
+              const id = ack.conversation._id;
+              const rest = prev.filter((c) => String(c._id) !== String(id));
+              return [ack.conversation, ...rest];
+            });
+          }
         } else {
-          await sendMessageApi({
-            conversationId: activeConversation._id,
+          const res = await sendMessageApi({
+            conversationId: conversation._id,
             receiverId: peerId,
             text: trimmed,
           });
-          await loadMessages(activeConversation._id);
+          if (res.data?.message) appendMessage(res.data.message);
+          await loadMessages(conversation._id);
         }
-        await refreshConversations();
-        await refreshNotifications();
       } catch (error) {
         console.error("[Messaging] send failed", error.message);
         throw error;
       } finally {
         setIsSending(false);
       }
+
+      scheduleBackgroundRefresh();
     },
-    [activeConversation, isAdmin, loadMessages, refreshConversations, refreshNotifications]
+    [isAdmin, loadMessages, appendMessage, scheduleBackgroundRefresh]
   );
 
-  const emitTyping = useCallback(
-    (isTyping) => {
-      if (!socketRef.current?.connected || !activeConversation?._id) return;
-      socketRef.current.emit("typing", {
-        conversationId: activeConversation._id,
-        isTyping,
-      });
-    },
-    [activeConversation]
-  );
+  const emitTyping = useCallback((isTyping) => {
+    const conversation = activeConversationRef.current;
+    if (!socketRef.current?.connected || !conversation?._id) return;
+    socketRef.current.emit("typing", {
+      conversationId: conversation._id,
+      isTyping,
+    });
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -163,6 +283,7 @@ export const MessagingProvider = ({ children }) => {
       setUnreadCount(0);
       setActiveConversation(null);
       setMessages([]);
+      setIsSending(false);
       return undefined;
     }
 
@@ -191,30 +312,39 @@ export const MessagingProvider = ({ children }) => {
       if (payload?.conversation) {
         setConversations((prev) => {
           const id = payload.conversation._id;
-          const rest = prev.filter((c) => c._id !== id);
+          const rest = prev.filter((c) => String(c._id) !== String(id));
           return [payload.conversation, ...rest];
         });
       }
+
+      const activeId = activeConversationRef.current?._id;
       if (
-        activeConversation?._id &&
-        String(payload?.message?.conversationId) === String(activeConversation._id)
+        activeId &&
+        payload?.message &&
+        String(payload.message.conversationId) === String(activeId)
       ) {
         setMessages((prev) => {
-          const exists = prev.some((m) => m._id === payload.message._id);
+          const exists = prev.some((m) => String(m._id) === String(payload.message._id));
           return exists ? prev : [...prev, payload.message];
         });
       }
-      refreshNotifications();
-      refreshConversations();
+
+      if (payload?.notification) {
+        setNotifications((prev) => [payload.notification, ...prev].slice(0, 50));
+      }
     });
 
     socket.on("notification", (notification) => {
       setNotifications((prev) => [notification, ...prev].slice(0, 50));
-      refreshNotifications();
+    });
+
+    socket.on("notification_read", (payload) => {
+      applyNotificationReadSync(payload);
     });
 
     socket.on("typing", (payload) => {
-      if (payload?.conversationId !== activeConversation?._id) return;
+      const activeId = activeConversationRef.current?._id;
+      if (!activeId || payload?.conversationId !== activeId) return;
       const myId = user?.id || user?._id;
       if (String(payload.userId) === String(myId)) return;
       setTypingUser(payload.isTyping ? payload.userName || "Someone" : "");
@@ -226,27 +356,29 @@ export const MessagingProvider = ({ children }) => {
 
     const pollId = setInterval(() => {
       if (!socket.connected) {
-        refreshNotifications();
-        refreshConversations();
-        if (isPanelOpen && activeConversation?._id) {
-          loadMessages(activeConversation._id);
+        scheduleBackgroundRefresh();
+        const activeId = activeConversationRef.current?._id;
+        if (isPanelOpenRef.current && activeId) {
+          loadMessages(activeId).catch(() => {});
         }
       }
-    }, 5000);
+    }, POLL_INTERVAL_MS);
 
     return () => {
       clearInterval(pollId);
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       socket.disconnect();
       socketRef.current = null;
+      setSocketConnected(false);
     };
   }, [
     user,
     refreshNotifications,
     refreshConversations,
-    activeConversation?._id,
-    isPanelOpen,
+    scheduleBackgroundRefresh,
     loadMessages,
+    applyNotificationReadSync,
   ]);
 
   useEffect(() => {
@@ -280,6 +412,7 @@ export const MessagingProvider = ({ children }) => {
       refreshNotifications,
       refreshConversations,
       loadMessages,
+      markNotificationAsRead,
     }),
     [
       conversations,
@@ -299,6 +432,7 @@ export const MessagingProvider = ({ children }) => {
       refreshNotifications,
       refreshConversations,
       loadMessages,
+      markNotificationAsRead,
     ]
   );
 

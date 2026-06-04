@@ -2,11 +2,13 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
+import { resolveT } from "../utils/i18nDisplay";
 import heroHealthcareImage from "../assets/hero-healthcare.png";
 
 const HeroSection = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const activeLang = i18n.resolvedLanguage || i18n.language || "en";
   const startCheckHref = user ? "/dashboard" : "/login";
   const trustBadges = [
     "WHO-Grade Guidance",
@@ -59,7 +61,7 @@ const HeroSection = () => {
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
             <span className="inline-flex w-fit items-center rounded-full border border-cyan-200/25 bg-white/10 px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100 shadow-[0_0_24px_rgba(45,212,191,0.18)] backdrop-blur">
-              {t("aiHealthProtection")}
+              {resolveT(t, "aiHealthProtection", activeLang)}
             </span>
 
             <h1 className="mt-6 max-w-[580px] text-4xl font-semibold leading-tight text-slate-50 md:text-5xl lg:text-[3.4rem] lg:leading-[1.05]">

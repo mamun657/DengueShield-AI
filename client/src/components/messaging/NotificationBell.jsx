@@ -18,6 +18,7 @@ const NotificationBell = () => {
     conversations,
     openChat,
     refreshNotifications,
+    markNotificationAsRead,
     isAdmin,
   } = useMessaging();
   const [open, setOpen] = useState(false);
@@ -33,6 +34,11 @@ const NotificationBell = () => {
 
   const handleNotificationClick = async (item) => {
     setOpen(false);
+
+    if (item?._id && !item.read) {
+      await markNotificationAsRead(item._id);
+    }
+
     if (item.conversationId) {
       const conv = conversations.find((c) => String(c._id) === String(item.conversationId));
       if (conv) {

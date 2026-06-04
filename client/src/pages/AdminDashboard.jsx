@@ -303,6 +303,49 @@ const AlertCard = ({ alert }) => {
   );
 };
 
+const CriticalPatientAlertCard = ({ alert, onOpenPatient }) => {
+  const warningList = alert.warningSigns?.length
+    ? alert.warningSigns
+    : alert.symptoms || [];
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenPatient?.(alert)}
+      className="w-full rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-left transition hover:border-red-400/50"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-white">
+            Patient #{String(alert.patientId || alert.id).slice(-6)}
+          </p>
+          <p className="text-xs text-slate-300">{alert.patientName}</p>
+        </div>
+        <span
+          className={`rounded-full border px-3 py-1 text-xs font-semibold ${STATUS_COLORS.CRITICAL}`}
+        >
+          CRITICAL
+        </span>
+      </div>
+      <div className="mt-3 flex items-center justify-between text-sm text-slate-200">
+        <span>Risk</span>
+        <span className="font-semibold text-white">{alert.riskScore}</span>
+      </div>
+      {alert.riskTrendLabel && (
+        <p className="mt-2 text-xs text-rose-200/90">
+          Trend: {alert.riskTrendLabel}
+        </p>
+      )}
+      <p className="mt-2 text-xs text-slate-300">
+        Warning Signs: {truncateSymptoms(warningList)}
+      </p>
+      <p className="mt-2 text-xs text-cyan-200/90">
+        Recommended: {alert.recommendedAction || "Immediate Clinical Follow-up"}
+      </p>
+    </button>
+  );
+};
+
 const ChartTooltip = ({ active, payload, label }) => {
   if (!active || !payload || payload.length === 0) return null;
   return (
@@ -356,6 +399,7 @@ const AdminDashboard = () => {
     pregnantHighRisk: 0,
   });
   const [alerts, setAlerts] = useState([]);
+  const [criticalPatientAlerts, setCriticalPatientAlerts] = useState([]);
   const [records, setRecords] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -379,14 +423,16 @@ const AdminDashboard = () => {
     const loadAdminData = async () => {
       try {
         setIsLoading(true);
-        const [overviewRes, alertsRes, recordsRes] = await Promise.all([
+        const [overviewRes, alertsRes, criticalRes, recordsRes] = await Promise.all([
           api.get("/admin/overview"),
           api.get("/admin/alerts"),
+          api.get("/admin/critical-patients"),
           api.get("/admin/records"),
         ]);
         if (!isMounted) return;
         setOverview(overviewRes.data);
         setAlerts(alertsRes.data || []);
+        setCriticalPatientAlerts(criticalRes.data || []);
         setRecords(recordsRes.data || []);
       } catch (error) {
         console.error("Failed to load admin dashboard", error);
@@ -604,6 +650,23 @@ const AdminDashboard = () => {
   const sourceRecords = records.length > 0 ? records : demoRecords;
   const displayAlerts = alerts.length > 0 ? alerts : demoAlerts;
 
+  const demoCriticalPatientAlerts = demoRecords
+    .filter((record) => Number(record.computed?.riskScore || 0) >= 80)
+    .map((record) => ({
+      id: `demo-critical-${record._id}`,
+      patientId: record.user?.email || record._id,
+      patientName: record.user?.name || "Unknown",
+      riskScore: record.computed.riskScore,
+      riskTrendLabel: `${Math.max(20, record.computed.riskScore - 25)} → ${record.computed.riskScore}`,
+      warningSigns: record.symptoms || [],
+      recommendedAction: "Immediate Clinical Follow-up",
+      status: "CRITICAL",
+      timestamp: record.date,
+    }));
+
+  const displayCriticalPatients =
+    criticalPatientAlerts.length > 0 ? criticalPatientAlerts : demoCriticalPatientAlerts;
+
   const patientGroups = useMemo(() => groupRecordsByPatient(sourceRecords), [sourceRecords]);
 
   const patientRows = useMemo(
@@ -623,6 +686,20 @@ const AdminDashboard = () => {
       }),
     [patientGroups]
   );
+
+  const openPatientFromCriticalAlert = (alert) => {
+    const match = patientRows.find(
+      (row) =>
+        String(row.patient?._id) === String(alert.patientId) ||
+        row.patient?.email === alert.patientEmail ||
+        row.patient?.name === alert.patientName
+    );
+    if (match) {
+      openPatientDetails(match);
+      return;
+    }
+    appendAction(`Critical alert selected for ${alert.patientName || "patient"}`);
+  };
 
   const filteredPatients = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -743,18 +820,39 @@ const AdminDashboard = () => {
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-        <div className={ADMIN_CARD_BASE}>
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-white">🚨 Live Critical Alerts</h2>
-            <span className="text-xs text-slate-400">Auto-sorted by risk score</span>
+        <div className={`${ADMIN_CARD_BASE} space-y-5`}>
+          <div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-white">🚨 ACTIVE CRITICAL PATIENTS</h2>
+              <span className="text-xs text-slate-400">Critical Patient Agent</span>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {displayCriticalPatients.length === 0 && (
+                <p className="text-sm text-slate-400">No active critical patients.</p>
+              )}
+              {displayCriticalPatients.map((alert) => (
+                <CriticalPatientAlertCard
+                  key={alert.id}
+                  alert={alert}
+                  onOpenPatient={openPatientFromCriticalAlert}
+                />
+              ))}
+            </div>
           </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {displayAlerts.length === 0 && (
-              <p className="text-sm text-slate-400">No active high-risk alerts.</p>
-            )}
-            {displayAlerts.map((alert) => (
-              <AlertCard key={alert.id} alert={alert} />
-            ))}
+
+          <div className="border-t border-white/10 pt-5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white">Live Critical Alerts</h2>
+              <span className="text-xs text-slate-400">Auto-sorted by risk score</span>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {displayAlerts.length === 0 && (
+                <p className="text-sm text-slate-400">No active high-risk alerts.</p>
+              )}
+              {displayAlerts.map((alert) => (
+                <AlertCard key={alert.id} alert={alert} />
+              ))}
+            </div>
           </div>
         </div>
 

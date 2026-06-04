@@ -1,5 +1,6 @@
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { navLabel, resolveT } from "./utils/i18nDisplay";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { MessagingProvider } from "./context/MessagingContext";
 import { ClinicalStoreProvider } from "./store/useClinicalStore.jsx";
@@ -23,10 +24,13 @@ const Nav = () => {
   const { t, i18n } = useTranslation();
   const { user, logout } = useAuth();
   const isAdmin = String(user?.role || "").toLowerCase() === "admin";
+  const activeLang = i18n.resolvedLanguage || i18n.language || "en";
 
   return (
     <nav className="sticky top-0 z-40 mx-3 mt-3 flex h-14 items-center justify-between rounded-2xl border border-white/10 bg-[#0b1730]/72 px-5 shadow-[0_6px_20px_rgba(2,6,23,0.3)] backdrop-blur-xl md:mx-6 md:px-7">
-      <div className="text-base font-semibold tracking-tight text-slate-100">{t("appName")}</div>
+      <div className="text-base font-semibold tracking-tight text-slate-100">
+        {resolveT(t, "appName", activeLang)}
+      </div>
       <div className="hidden items-center gap-7 text-sm text-slate-300 lg:flex">
         {!user && (
           <>
@@ -36,25 +40,40 @@ const Nav = () => {
             <a className="transition-colors duration-200 hover:text-cyan-200" href="#contact">Contact</a>
           </>
         )}
-        {user && <Link className="transition-colors duration-200 hover:text-cyan-200" to="/dashboard">{t("dashboard")}</Link>}
-        {isAdmin && <Link className="transition-colors duration-200 hover:text-cyan-200" to="/admin">{t("admin")}</Link>}
+        {user && (
+          <Link className="transition-colors duration-200 hover:text-cyan-200" to="/dashboard">
+            {resolveT(t, "dashboard", activeLang)}
+          </Link>
+        )}
+        {isAdmin && (
+          <Link className="transition-colors duration-200 hover:text-cyan-200" to="/admin">
+            {resolveT(t, "admin", activeLang)}
+          </Link>
+        )}
       </div>
       <div className="flex items-center gap-2.5 text-sm text-slate-300">
         <button
           className="rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 transition hover:border-cyan-200/40 hover:text-cyan-100"
-          onClick={() => i18n.changeLanguage(i18n.language === "en" ? "bn" : "en")}
+          onClick={() => i18n.changeLanguage(activeLang.startsWith("bn") ? "en" : "bn")}
           type="button"
+          aria-label={
+            activeLang.startsWith("bn")
+              ? "Switch language to English"
+              : "ভাষা বাংলায় পরিবর্তন করুন"
+          }
         >
-          {t("langToggle")}
+          {navLabel("langToggle", activeLang)}
         </button>
         {user ? (
-          <button className="transition hover:text-cyan-100" onClick={logout} type="button">{t("logout")}</button>
+          <button className="transition hover:text-cyan-100" onClick={logout} type="button">
+            {resolveT(t, "logout", activeLang)}
+          </button>
         ) : (
           <Link
             className="rounded-lg bg-gradient-to-r from-[#22d3ee] to-[#14b8a6] px-4 py-2 font-semibold text-[#062036] transition duration-300 hover:brightness-110"
             to="/login"
           >
-            {t("login")}
+            {resolveT(t, "login", activeLang)}
           </Link>
         )}
       </div>

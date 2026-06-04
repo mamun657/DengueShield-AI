@@ -141,65 +141,15 @@ const sendMessage = async ({ sender, receiverId, text, io }) => {
 const evaluateRiskNotifications = async (record, io) => {
   if (!record?.user) return;
 
-  const patient = await User.findById(record.user).select("name email");
-  if (!patient) return;
+  const { resolveAdminNotificationPolicy } = require("./notificationPolicyService");
+  const adminPolicy = resolveAdminNotificationPolicy({ record });
 
-  const admin = await getDefaultAdmin().catch(() => null);
-  if (!admin) return;
+  // WATCHLIST (50–74): monitoring only — no admin care-team alerts.
+  // CRITICAL admin alerts are sent from Critical Patient Agent MCP escalation to avoid duplicates.
+  if (!adminPolicy.shouldNotify) return;
 
-  const score = Number(record.computed?.riskScore || 0);
-  const level = String(record.computed?.riskLevel || "").toUpperCase();
-  const temp = Number(record.temperature || 0);
-  const symptoms = (record.symptoms || []).map((s) => String(s).toLowerCase());
-  const emergencySymptoms = ["bleeding", "restlessness", "vomiting", "abdominal pain"];
-  const hasEmergency = emergencySymptoms.some((s) => symptoms.includes(s));
-
-  const triggers = [];
-
-  if (level === "CRITICAL" || score >= 80) {
-    triggers.push({
-      type: "critical_alert",
-      title: "Critical patient alert",
-      body: `${patient.name || "Patient"} risk is CRITICAL (${score}/100). Immediate review recommended.`,
-    });
-  } else if (level === "HIGH" || score >= 65) {
-    triggers.push({
-      type: "high_risk",
-      title: "High-risk patient alert",
-      body: `${patient.name || "Patient"} entered HIGH risk (${score}/100).`,
-    });
-  }
-
-  if (temp >= 39.5) {
-    triggers.push({
-      type: "critical_alert",
-      title: "High fever alert",
-      body: `${patient.name || "Patient"} reported fever ${temp}°C.`,
-    });
-  }
-
-  if (hasEmergency) {
-    triggers.push({
-      type: "emergency",
-      title: "Emergency signs detected",
-      body: `${patient.name || "Patient"} reported warning signs: ${symptoms.join(", ")}.`,
-    });
-  }
-
-  const conversation = await getOrCreateConversation(patient._id, admin._id);
-
-  for (const trigger of triggers) {
-    const notification = await createNotification({
-      userId: admin._id,
-      type: trigger.type,
-      title: trigger.title,
-      body: trigger.body,
-      conversationId: conversation._id,
-      relatedUserId: patient._id,
-      metadata: { recordId: record._id, riskScore: score, riskLevel: level },
-    });
-    emitToUser(io, String(admin._id), "notification", notification);
-  }
+  // HIGH RISK (75–89): patient-only notifications — no admin alert per policy.
+  void io;
 };
 
 module.exports = {

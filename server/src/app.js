@@ -75,12 +75,18 @@ app.use((req, _res, next) => {
   });
   next();
 });
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 1000,
-  })
-);
+const apiRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: Number(process.env.API_RATE_LIMIT || 1000),
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Real-time messaging uses Socket.IO; avoid throttling chat REST fallbacks.
+    if (req.path.startsWith("/messaging")) return true;
+    return false;
+  },
+});
+app.use("/api", apiRateLimiter);
 
 app.get("/api/healthz", (_req, res) => res.json({ status: "ok" }));
 app.get("/api/test-ai", (_req, res) => res.json({ success: true, message: "AI route works" }));

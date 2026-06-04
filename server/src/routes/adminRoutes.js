@@ -3,6 +3,8 @@ const { protect, authorize } = require("../middleware/authMiddleware");
 const {
   getAdminOverview,
   getAdminAlerts,
+  getCriticalPatientAlerts,
+  resolveCriticalPatientAlert,
   getAllUsers,
   getAllHealthRecords,
   updateUserByAdmin,
@@ -18,6 +20,13 @@ const router = express.Router();
 
 router.get("/overview", protect, authorize("admin"), getAdminOverview);
 router.get("/alerts", protect, authorize("admin"), getAdminAlerts);
+router.get("/critical-patients", protect, authorize("admin"), getCriticalPatientAlerts);
+router.patch(
+  "/critical-patients/:id/resolve",
+  protect,
+  authorize("admin"),
+  resolveCriticalPatientAlert
+);
 router.get("/users", protect, authorize("admin"), getAllUsers);
 router.get("/records", protect, authorize("admin"), getAllHealthRecords);
 router.patch("/users/:id", protect, authorize("admin"), updateUserByAdmin);

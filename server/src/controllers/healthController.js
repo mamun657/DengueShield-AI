@@ -147,6 +147,14 @@ const createHealthRecord = async (req, res) => {
       console.warn("[Messaging] risk notification skipped:", notifyError.message);
     }
 
+    try {
+      const { runCriticalPatientAgent } = require("../agents/criticalPatientAgent");
+      const io = req.app.get("io");
+      await runCriticalPatientAgent(record, io);
+    } catch (agentError) {
+      console.warn("[CriticalPatientAgent] monitoring skipped:", agentError.message);
+    }
+
     return res.status(201).json(record);
   } catch (error) {
     return res.status(400).json({ message: error.message });

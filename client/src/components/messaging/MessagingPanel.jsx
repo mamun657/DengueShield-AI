@@ -12,12 +12,15 @@ const MessagingPanel = () => {
     isSending,
     typingUser,
     isAdmin,
+    socketConnected,
     messagesEndRef,
     emitTyping,
   } = useMessaging();
   const { user } = useAuth();
   const [draft, setDraft] = useState("");
+  const [sendError, setSendError] = useState("");
   const myId = user?.id || user?._id;
+  const canSend = Boolean(activeConversation?._id) && Boolean(draft.trim()) && !isSending;
 
   if (!isPanelOpen) return null;
 
@@ -27,13 +30,23 @@ const MessagingPanel = () => {
   const peerName = peer?.name || (isAdmin ? "Patient" : "Care Team");
 
   const handleSend = async () => {
-    if (!draft.trim()) return;
+    const text = draft.trim();
+    if (!text || isSending) return;
+    if (!activeConversation?._id) {
+      setSendError("Chat is still loading. Please wait a moment and try again.");
+      return;
+    }
+
+    const previousDraft = draft;
+    setSendError("");
+    setDraft("");
+    emitTyping(false);
+
     try {
-      await sendMessage(draft);
-      setDraft("");
-      emitTyping(false);
-    } catch {
-      // keep draft on failure
+      await sendMessage(text);
+    } catch (error) {
+      setDraft(previousDraft);
+      setSendError(error?.message || "Failed to send message. Please try again.");
     }
   };
 
@@ -89,12 +102,20 @@ const MessagingPanel = () => {
       </div>
 
       <div className="border-t border-white/10 p-3">
+        {sendError && <p className="mb-2 text-xs text-rose-300">{sendError}</p>}
+        {!activeConversation?._id && (
+          <p className="mb-2 text-xs text-amber-300">Connecting conversation...</p>
+        )}
+        {!socketConnected && activeConversation?._id && (
+          <p className="mb-2 text-xs text-slate-400">Reconnecting to chat server...</p>
+        )}
         <div className="flex gap-2">
           <input
             type="text"
             value={draft}
             onChange={(e) => {
               setDraft(e.target.value);
+              if (sendError) setSendError("");
               emitTyping(true);
             }}
             onKeyDown={(e) => {
@@ -109,10 +130,10 @@ const MessagingPanel = () => {
           <button
             type="button"
             onClick={handleSend}
-            disabled={isSending || !draft.trim()}
-            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+            disabled={!canSend}
+            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Send
+            {isSending ? "Sending..." : "Send"}
           </button>
         </div>
       </div>
