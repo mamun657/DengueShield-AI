@@ -20,8 +20,15 @@
 </p>
 
 ---
-🎥 Project Demo Video:
-https://www.youtube.com/watch?v=DIRNgydpPas
+# 🌐 Live Website
+
+🔗 https://dengueshield-ai.onrender.com/
+
+---
+
+# 🎥 Demo Video
+
+▶️ https://www.youtube.com/watch?v=3B5NPTQut7o
 
 ---
 
@@ -257,7 +264,7 @@ Reports include:
 - AI recommendations
 - Emergency guidance
 - Monitoring history
-- 
+  
 
 
 <p align="center">
@@ -425,8 +432,6 @@ We prioritize safe and transparent AI practices.
 
 # 🚀 Future Improvements
 
-- IoT health monitoring
-- Mobile application
 - National dengue surveillance
 - Multi-disease support
 - Telemedicine integration
