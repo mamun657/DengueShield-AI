@@ -68,12 +68,6 @@ const HeroSection = () => {
               AI-Powered Dengue Detection Before Symptoms Become Critical
             </h1>
 
-            <p className="mt-6 text-base leading-8 text-slate-200 md:text-lg">
-              Bangladesh-first clinical intelligence built for families and care teams. Track daily symptoms,
-              receive explainable risk alerts, and act early with WHO-grade recommendations guided by
-              real-time AI monitoring.
-            </p>
-
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <Link
                 className="group inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-teal-400 px-7 py-3.5 text-sm font-semibold text-[#05202f] shadow-[0_12px_32px_rgba(45,212,191,0.35)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_52px_rgba(45,212,191,0.6)]"
