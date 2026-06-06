@@ -119,7 +119,7 @@ const HeroSection = () => {
               </h1>
 
               {/* Clean subheadline - minimal background interference */}
-              <p className="mt-8 text-base md:text-lg leading-relaxed text-slate-300 max-w-[520px] font-light" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>
+              <p className="mt-8 text-base md:text-lg leading-relaxed text-slate-300 max-w-[420px] font-light" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>
                 <span className="text-slate-100 font-medium">AI-powered dengue risk intelligence</span> built to identify warning signs, analyze symptom progression, and recommend early action before complications develop.
               </p>
             </div>
@@ -142,7 +142,7 @@ const HeroSection = () => {
 
             {/* Trust indicators */}
             <motion.div
-              className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-3 max-w-[520px]"
+              className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-3 max-w-[420px]"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.4 }}
