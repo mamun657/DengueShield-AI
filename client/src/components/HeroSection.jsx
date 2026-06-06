@@ -64,10 +64,67 @@ const HeroSection = () => {
               {resolveT(t, "aiHealthProtection", activeLang)}
             </span>
 
-            <h1 className="mt-6 max-w-[580px] text-4xl font-semibold leading-tight text-slate-50 md:text-5xl lg:text-[3.4rem] lg:leading-[1.05]">
-              AI-Powered Dengue Detection Before Symptoms Become Critical
-            </h1>
+            {/* Animated accent line */}
+            <motion.div
+              className="absolute left-0 top-0 h-1 bg-gradient-to-r from-cyan-400 via-teal-400 to-transparent"
+              initial={{ width: 0 }}
+              animate={{ width: "80px" }}
+              transition={{ duration: 1.2, ease: "easeOut" }}
+              style={{ marginLeft: "clamp(24px, 6vw, 96px)" }}
+            />
 
+            {/* Clean headline - integrated with hero image */}
+            <div className="relative mt-6 max-w-[600px]">
+              <h1 className="text-5xl md:text-6xl lg:text-[4.5rem] font-black leading-tight tracking-tighter text-slate-50" style={{ textShadow: "0 2px 8px rgba(0,0,0,0.4), 0 0 20px rgba(6,182,212,0.1)" }}>
+                {/* Label */}
+                <span className="block text-xs font-medium text-cyan-300/90 tracking-widest mb-6 uppercase">
+                  AI Clinical Intelligence
+                </span>
+
+                {/* Line 1: Predict [Risk] */}
+                <span className="block leading-tight mb-2">
+                  <span>Predict </span>
+                  <span className="relative inline-block">
+                    {/* Minimal glow - removed heavy blur */}
+                    <span className="absolute -inset-2 rounded-lg bg-cyan-500/10 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <span className="text-cyan-400">
+                      Risk
+                    </span>
+                  </span>
+                </span>
+
+                {/* Line 2: Track [Symptoms] */}
+                <span className="block leading-tight mb-2">
+                  <span>Track </span>
+                  <span className="relative inline-block">
+                    {/* Minimal glow */}
+                    <span className="absolute -inset-2 rounded-lg bg-teal-500/10 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <span className="text-teal-400">
+                      Symptoms
+                    </span>
+                  </span>
+                </span>
+
+                {/* Line 3: Act [Early] */}
+                <span className="block leading-tight">
+                  <span>Act </span>
+                  <span className="relative inline-block">
+                    {/* Minimal glow */}
+                    <span className="absolute -inset-2 rounded-lg bg-green-500/10 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <span className="text-emerald-400">
+                      Early
+                    </span>
+                  </span>
+                </span>
+              </h1>
+
+              {/* Clean subheadline - minimal background interference */}
+              <p className="mt-8 text-base md:text-lg leading-relaxed text-slate-300 max-w-[520px] font-light" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>
+                <span className="text-slate-100 font-medium">AI-powered dengue risk intelligence</span> built to identify warning signs, analyze symptom progression, and recommend early action before complications develop.
+              </p>
+            </div>
+
+            {/* CTA Section */}
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <Link
                 className="group inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-teal-400 px-7 py-3.5 text-sm font-semibold text-[#05202f] shadow-[0_12px_32px_rgba(45,212,191,0.35)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_52px_rgba(45,212,191,0.6)]"
@@ -82,6 +139,31 @@ const HeroSection = () => {
                 See How It Works
               </a>
             </div>
+
+            {/* Trust indicators */}
+            <motion.div
+              className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-3 max-w-[520px]"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+            >
+              <div className="flex items-center gap-2 text-xs text-slate-300">
+                <span className="text-cyan-400 font-bold">✓</span>
+                <span>WHO-guided monitoring</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-300">
+                <span className="text-cyan-400 font-bold">✓</span>
+                <span>Clinical-grade AI analysis</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-300">
+                <span className="text-cyan-400 font-bold">✓</span>
+                <span>Offline-ready platform</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-300">
+                <span className="text-cyan-400 font-bold">✓</span>
+                <span>Critical patient alerts</span>
+              </div>
+            </motion.div>
 
             <div className="mt-8 flex flex-wrap gap-3">
               {trustBadges.map((badge) => (
