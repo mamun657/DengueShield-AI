@@ -12,10 +12,10 @@ const {
 const {
   notifyAdminCriticalPatient,
   notifyPatientCritical,
-  notifyPatientHighRisk,
   resolveDefaultAdmin,
 } = require("../services/notificationDeliveryService");
-const { resolvePatientNotificationPolicy } = require("../services/notificationPolicyService");
+const { resolvePatientNotificationPolicy, SCORE } = require("../services/notificationPolicyService");
+const { hasExistingRiskNotification } = require("../services/riskNotificationService");
 const { getOrCreateConversation } = require("../services/messagingService");
 
 const CLASSIFICATION = {
@@ -126,15 +126,8 @@ const executeCriticalActions = async ({
     });
   }
 
-  // CRITICAL: notify patient + admin (care team channel linked on critical alerts)
-  await notifyPatientCritical({
-    patientId: patient._id,
-    record,
-    alertDoc,
-    io,
-    conversationId: conversation?._id || null,
-  });
-
+  // Patient critical alert is dispatched immediately by riskNotificationService.
+  // Agent path only escalates admin care-team alerts here.
   console.log(
     "[CriticalPatientAgent] ACTION: critical alert",
     alertDoc._id,
@@ -223,21 +216,26 @@ const runCriticalPatientAgent = async (record, io = null) => {
       };
     }
 
-    // HIGH RISK: notify patient only (score 75–89, no MCP/admin escalation).
-    if (notifyPolicy.patientLevel === "HIGH_RISK") {
-      await notifyPatientHighRisk({ patientId: patient._id, record, io });
-      return {
-        classification,
-        alert: null,
-        riskTrend,
-        warningSigns,
-        trendDirection,
-        decisionReasons,
-        notifyPolicy,
-      };
+    // HIGH RISK patient alerts are dispatched immediately by riskNotificationService.
+
+    // MCP-only patient escalation when agent classifies critical below score threshold.
+    if (
+      notifyPolicy.patientLevel === "CRITICAL" &&
+      classification === CLASSIFICATION.CRITICAL &&
+      riskScore < SCORE.HIGH_RISK_MIN
+    ) {
+      const alreadyNotified = await hasExistingRiskNotification(patient._id, record._id);
+      if (!alreadyNotified) {
+        await notifyPatientCritical({
+          patientId: patient._id,
+          record,
+          alertDoc: null,
+          io,
+        });
+      }
     }
 
-    // CRITICAL: notify patient + admin + MCP escalation (score ≥ 90 or clinical/MCP exception).
+    // CRITICAL: admin + MCP escalation (score ≥ 90, clinical exception, or agent trend).
     if (notifyPolicy.escalateMcp) {
       const alertDoc = await executeCriticalActions({
         patient,

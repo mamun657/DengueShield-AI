@@ -1,5 +1,7 @@
-const Notification = require("../models/Notification");
-const { createNotification, emitToUser, getDefaultAdmin } = require("./messagingService");
+const User = require("../models/User");
+const { createNotification, emitToUser, getDefaultAdmin, countUnreadForUser } = require("./messagingService");
+
+const RISK_ALERT_TYPES = new Set(["patient_risk_warning", "patient_critical_alert"]);
 
 /**
  * Extensible notification delivery layer.
@@ -26,6 +28,18 @@ const channelHandlers = {
       metadata: payload.metadata || {},
     });
     emitToUser(io, String(userId), "notification", notification);
+
+    if (RISK_ALERT_TYPES.has(payload.type)) {
+      const user = await User.findById(userId).select("_id role");
+      const counts = user ? await countUnreadForUser(user) : { unreadCount: 1 };
+      emitToUser(io, String(userId), "risk_alert", {
+        notification,
+        level: payload.metadata?.notificationLevel || null,
+        unreadCount: counts.unreadCount,
+        source: "risk_engine",
+      });
+    }
+
     return notification;
   },
   [CHANNELS.SMS]: async ({ payload }) => {

@@ -3,6 +3,27 @@ const Message = require("../models/Message");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
 
+const countUnreadForUser = async (user) => {
+  const notificationUnread = await Notification.countDocuments({
+    userId: user._id,
+    read: false,
+  });
+
+  const conversations = await Conversation.find(
+    user.role === "admin" ? { adminId: user._id } : { patientId: user._id }
+  ).lean();
+
+  const messageUnread = conversations.reduce((sum, conversation) => {
+    return sum + (user.role === "admin" ? conversation.unreadForAdmin : conversation.unreadForPatient);
+  }, 0);
+
+  return {
+    notificationUnread,
+    messageUnread,
+    unreadCount: Math.max(notificationUnread, messageUnread),
+  };
+};
+
 const getDefaultAdmin = async () => {
   const admin = await User.findOne({ role: "admin", isActive: { $ne: false } }).select(
     "_id name email role"
@@ -139,17 +160,10 @@ const sendMessage = async ({ sender, receiverId, text, io }) => {
 };
 
 const evaluateRiskNotifications = async (record, io) => {
-  if (!record?.user) return;
+  if (!record?.user) return null;
 
-  const { resolveAdminNotificationPolicy } = require("./notificationPolicyService");
-  const adminPolicy = resolveAdminNotificationPolicy({ record });
-
-  // WATCHLIST (50–74): monitoring only — no admin care-team alerts.
-  // CRITICAL admin alerts are sent from Critical Patient Agent MCP escalation to avoid duplicates.
-  if (!adminPolicy.shouldNotify) return;
-
-  // HIGH RISK (75–89): patient-only notifications — no admin alert per policy.
-  void io;
+  const { dispatchImmediateRiskNotifications } = require("./riskNotificationService");
+  return dispatchImmediateRiskNotifications(record, io);
 };
 
 module.exports = {
@@ -159,4 +173,5 @@ module.exports = {
   sendMessage,
   evaluateRiskNotifications,
   emitToUser,
+  countUnreadForUser,
 };

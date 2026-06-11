@@ -12,6 +12,10 @@ import {
   openConversationWithPatient,
   sendMessage as sendMessageApi,
 } from "../api/messagingApi";
+import {
+  buildLocalRiskAlert,
+  isRiskAlertNotification,
+} from "../utils/riskNotification";
 
 const MessagingContext = createContext(null);
 const SOCKET_SEND_TIMEOUT_MS = 12000;
@@ -29,7 +33,9 @@ export const MessagingProvider = ({ children }) => {
   const [isSending, setIsSending] = useState(false);
   const [typingUser, setTypingUser] = useState("");
   const [socketConnected, setSocketConnected] = useState(false);
+  const [activeRiskAlert, setActiveRiskAlert] = useState(null);
   const socketRef = useRef(null);
+  const seenRiskAlertKeysRef = useRef(new Set());
   const typingTimerRef = useRef(null);
   const messagesEndRef = useRef(null);
   const activeConversationRef = useRef(null);
@@ -115,6 +121,65 @@ export const MessagingProvider = ({ children }) => {
       );
     },
     [user, notifications, scheduleBackgroundRefresh]
+  );
+
+  const getRiskAlertKey = useCallback((notification) => {
+    const recordId = notification?.metadata?.recordId;
+    const level = notification?.metadata?.notificationLevel || notification?.type;
+    if (recordId) return `${recordId}:${level}`;
+    return notification?._id ? String(notification._id) : null;
+  }, []);
+
+  const showRiskAlert = useCallback(
+    (notification) => {
+      if (!notification || !isRiskAlertNotification(notification)) return;
+      const key = getRiskAlertKey(notification);
+      if (key && seenRiskAlertKeysRef.current.has(key)) return;
+      if (key) seenRiskAlertKeysRef.current.add(key);
+      setActiveRiskAlert(notification);
+    },
+    [getRiskAlertKey]
+  );
+
+  const applyIncomingNotification = useCallback(
+    (notification, { syncUnreadCount = true } = {}) => {
+      if (!notification?._id && !notification?.metadata?.recordId) return;
+
+      let added = false;
+      setNotifications((prev) => {
+        const exists = prev.some(
+          (item) =>
+            (notification._id && String(item._id) === String(notification._id)) ||
+            (notification.metadata?.recordId &&
+              item.metadata?.recordId === notification.metadata.recordId &&
+              item.type === notification.type)
+        );
+        if (exists) return prev;
+        added = true;
+        return [notification, ...prev].slice(0, 50);
+      });
+
+      if (added && syncUnreadCount && !notification.read) {
+        setUnreadCount((count) => count + 1);
+      }
+
+      showRiskAlert(notification);
+    },
+    [showRiskAlert]
+  );
+
+  const dismissRiskAlert = useCallback(() => {
+    setActiveRiskAlert(null);
+  }, []);
+
+  const evaluateRiskAlertFromRecord = useCallback(
+    (record) => {
+      const alert = buildLocalRiskAlert(record);
+      if (!alert) return null;
+      applyIncomingNotification(alert, { syncUnreadCount: true });
+      return alert;
+    },
+    [applyIncomingNotification]
   );
 
   const applyNotificationReadSync = useCallback((payload) => {
@@ -284,6 +349,8 @@ export const MessagingProvider = ({ children }) => {
       setActiveConversation(null);
       setMessages([]);
       setIsSending(false);
+      setActiveRiskAlert(null);
+      seenRiskAlertKeysRef.current = new Set();
       return undefined;
     }
 
@@ -330,12 +397,24 @@ export const MessagingProvider = ({ children }) => {
       }
 
       if (payload?.notification) {
-        setNotifications((prev) => [payload.notification, ...prev].slice(0, 50));
+        applyIncomingNotification(payload.notification);
       }
     });
 
     socket.on("notification", (notification) => {
-      setNotifications((prev) => [notification, ...prev].slice(0, 50));
+      applyIncomingNotification(notification);
+    });
+
+    socket.on("risk_alert", (payload) => {
+      if (payload?.notification) {
+        applyIncomingNotification(payload.notification, { syncUnreadCount: false });
+      }
+      if (payload?.unreadCount != null) {
+        setUnreadCount(Number(payload.unreadCount));
+      }
+      if (payload?.notification) {
+        showRiskAlert(payload.notification);
+      }
     });
 
     socket.on("notification_read", (payload) => {
@@ -379,6 +458,8 @@ export const MessagingProvider = ({ children }) => {
     scheduleBackgroundRefresh,
     loadMessages,
     applyNotificationReadSync,
+    applyIncomingNotification,
+    showRiskAlert,
   ]);
 
   useEffect(() => {
@@ -413,6 +494,9 @@ export const MessagingProvider = ({ children }) => {
       refreshConversations,
       loadMessages,
       markNotificationAsRead,
+      activeRiskAlert,
+      dismissRiskAlert,
+      evaluateRiskAlertFromRecord,
     }),
     [
       conversations,
@@ -433,6 +517,9 @@ export const MessagingProvider = ({ children }) => {
       refreshConversations,
       loadMessages,
       markNotificationAsRead,
+      activeRiskAlert,
+      dismissRiskAlert,
+      evaluateRiskAlertFromRecord,
     ]
   );
 

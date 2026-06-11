@@ -18,6 +18,7 @@ import ProfilePage from "./pages/ProfilePage";
 import ReportsPage from "./pages/ReportsPage";
 import GraphRagPage from "./pages/GraphRagPage";
 import MessagingPanel from "./components/messaging/MessagingPanel";
+import RiskAlertToast from "./components/messaging/RiskAlertToast";
 
 
 const Nav = () => {
@@ -137,6 +138,7 @@ const AppLayout = () => {
 
       </main>
       {user && <MessagingPanel />}
+      {user && <RiskAlertToast />}
       <Footer />
     </div>
   );

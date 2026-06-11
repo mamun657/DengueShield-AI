@@ -11,6 +11,7 @@ import {
   isNetworkOnline,
 } from "../services/offlineApi";
 import { useAuth } from "../context/AuthContext";
+import { useMessaging } from "../context/MessagingContext";
 import { useOfflineStatus } from "../hooks/useOfflineStatus";
 import OfflineStatusBanner from "../components/offline/OfflineStatusBanner";
 import RuralModeToggle from "../components/offline/RuralModeToggle";
@@ -305,6 +306,7 @@ const ReportSections = ({ report, density = "full", className = "" }) => {
 const DashboardPage = () => {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
+  const { evaluateRiskAlertFromRecord } = useMessaging();
   const { isOnline, userId: offlineUserId } = useOfflineStatus();
   const [lastSubmissionOffline, setLastSubmissionOffline] = useState(false);
   const [hospitalSearchLoading, setHospitalSearchLoading] = useState(false);
@@ -544,17 +546,19 @@ const DashboardPage = () => {
         offline
       );
 
+      // Immediate risk alert — do not wait for AI report generation
+      evaluateRiskAlertFromRecord(record);
+
       await load();
 
-      try {
-        const { report } = await generateReport(hospitals, {
-          recordLocalId: record?.localId,
+      generateReport(hospitals, { recordLocalId: record?.localId })
+        .then(({ report }) => {
+          if (report) setLatestReport(report);
+          return load();
+        })
+        .catch((reportError) => {
+          console.error("Failed to auto-generate report", reportError);
         });
-        if (report) setLatestReport(report);
-        await load();
-      } catch (reportError) {
-        console.error("Failed to auto-generate report", reportError);
-      }
     } catch (err) {
       const message = err?.response?.data?.message || "Failed to save record.";
       setPredictionError(message);

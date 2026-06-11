@@ -139,21 +139,27 @@ const createHealthRecord = async (req, res) => {
       computed.riskSource
     );
 
+    const io = req.app.get("io");
+
+    // Event: Risk Calculation → immediate notification (do not wait for AI agent)
     try {
       const { evaluateRiskNotifications } = require("../services/messagingService");
-      const io = req.app.get("io");
       await evaluateRiskNotifications(record, io);
     } catch (notifyError) {
-      console.warn("[Messaging] risk notification skipped:", notifyError.message);
+      console.warn("[RiskNotification] immediate dispatch skipped:", notifyError.message);
     }
 
-    try {
-      const { runCriticalPatientAgent } = require("../agents/criticalPatientAgent");
-      const io = req.app.get("io");
-      await runCriticalPatientAgent(record, io);
-    } catch (agentError) {
-      console.warn("[CriticalPatientAgent] monitoring skipped:", agentError.message);
-    }
+    // Critical Patient Agent continues asynchronously (admin/MCP escalation)
+    setImmediate(() => {
+      try {
+        const { runCriticalPatientAgent } = require("../agents/criticalPatientAgent");
+        runCriticalPatientAgent(record, io).catch((agentError) => {
+          console.warn("[CriticalPatientAgent] monitoring skipped:", agentError.message);
+        });
+      } catch (agentError) {
+        console.warn("[CriticalPatientAgent] monitoring skipped:", agentError.message);
+      }
+    });
 
     return res.status(201).json(record);
   } catch (error) {
