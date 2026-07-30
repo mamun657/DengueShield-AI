@@ -168,7 +168,10 @@ const createHealthRecord = async (req, res) => {
 };
 
 const getMyDashboard = async (req, res) => {
-  const records = await HealthRecord.find({ user: req.user._id }).sort({ date: -1 }).limit(7);
+  const records = await HealthRecord.find({ user: req.user._id })
+    .sort({ date: -1 })
+    .limit(7)
+    .lean();
   const ordered = [...records].reverse();
   const latest = ordered[ordered.length - 1] || null;
   return res.json({

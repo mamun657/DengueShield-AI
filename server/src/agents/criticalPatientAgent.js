@@ -99,6 +99,21 @@ const executeCriticalActions = async ({
   decisionReasons,
   io,
 }) => {
+  await CriticalAlert.updateMany(
+    {
+      patientId: patient._id,
+      classification: CLASSIFICATION.CRITICAL,
+      resolved: false,
+    },
+    {
+      $set: {
+        resolved: true,
+        resolvedAt: new Date(),
+        status: "resolved",
+      },
+    }
+  );
+
   const alertDoc = await CriticalAlert.create({
     type: "critical_patient",
     patientId: patient._id,

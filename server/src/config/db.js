@@ -18,9 +18,32 @@ const shouldFallbackToNonSrv = (error) => {
   );
 };
 
+const ensureIndexes = async () => {
+  const User = require("../models/User");
+  const HealthRecord = require("../models/HealthRecord");
+  const CriticalAlert = require("../models/CriticalAlert");
+
+  await Promise.all([
+    User.collection.createIndex({ email: 1 }, { unique: true, background: true }),
+    User.collection.createIndex({ createdAt: -1 }, { background: true }),
+    User.collection.createIndex({ role: 1, isActive: 1, createdAt: -1 }, { background: true }),
+    HealthRecord.collection.createIndex({ user: 1, date: -1 }, { background: true }),
+    HealthRecord.collection.createIndex({ user: 1, createdAt: -1 }, { background: true }),
+    HealthRecord.collection.createIndex({ date: -1 }, { background: true }),
+    CriticalAlert.collection.createIndex(
+      { patientId: 1, resolved: 1, createdAt: -1 },
+      { background: true }
+    ),
+  ]);
+
+  await Promise.all([User.syncIndexes(), HealthRecord.syncIndexes(), CriticalAlert.syncIndexes()]);
+  console.log("MongoDB indexes ensured");
+};
+
 const connectOnce = async (uri) => {
   await mongoose.connect(uri, buildOptions());
   console.log("MongoDB connected");
+  await ensureIndexes();
 };
 
 const connectWithRetry = async (uri, attempt = 1) => {

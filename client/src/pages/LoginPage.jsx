@@ -18,7 +18,7 @@ const LoginPage = () => {
     setError("");
     setIsSubmitting(true);
     try {
-      const { data } = await api.post("/auth/login", form);
+      const { data } = await api.post("/auth/login", form, { timeout: 15000 });
       login(data);
       navigate("/dashboard");
     } catch (err) {

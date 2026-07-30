@@ -25,16 +25,53 @@ export const canReachServer = async () => {
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
+    const timeout = setTimeout(() => controller.abort(), 1500);
     const res = await fetch(`${API_BASE_URL}/healthz`, { signal: controller.signal });
     clearTimeout(timeout);
     return res.ok;
   } catch (error) {
-    console.warn("[Offline API] healthz check failed", {
-      error: error?.message,
-      url: `${API_BASE_URL}/healthz`,
-    });
     return false;
+  }
+};
+
+const cacheDashboardInBackground = (userId, snapshot, reports = []) => {
+  if (!userId) return;
+  cacheDashboardSnapshot(userId, snapshot).catch(() => {});
+  reports.forEach((report) => {
+    cacheReport({ ...report, offlineAvailable: true }).catch?.(() => {});
+  });
+};
+
+export const loadDashboardData = async (userId) => {
+  if (!isNetworkOnline() || !hasAuthToken()) {
+    return loadOfflineDashboard(userId);
+  }
+
+  try {
+    const [dashRes, reportRes] = await Promise.all([
+      api.get("/health/dashboard", { timeout: 10000 }),
+      api.get("/reports", { timeout: 10000 }),
+    ]);
+    const snapshot = {
+      dashboard: dashRes.data,
+      reports: reportRes.data,
+    };
+    cacheDashboardInBackground(userId, snapshot, reportRes.data || []);
+    return { ...snapshot, offline: false };
+  } catch (err) {
+    const offlineCandidate =
+      !err?.response ||
+      err?.offline ||
+      err?.code === "ECONNABORTED" ||
+      err?.message?.includes("Network Error");
+
+    if (offlineCandidate) {
+      const reachable = await canReachServer();
+      if (!reachable) {
+        return loadOfflineDashboard(userId);
+      }
+    }
+    throw err;
   }
 };
 
@@ -119,33 +156,6 @@ export const generateReport = async (nearestHospitals = [], { recordLocalId } = 
   );
 
   return { report: offlineReport, offline: true };
-};
-
-export const loadDashboardData = async (userId) => {
-  const online = await canReachServer();
-
-  if (online) {
-    try {
-      const [dashRes, reportRes] = await Promise.all([
-        api.get("/health/dashboard"),
-        api.get("/reports"),
-      ]);
-      const snapshot = {
-        dashboard: dashRes.data,
-        reports: reportRes.data,
-      };
-      await cacheDashboardSnapshot(userId, snapshot);
-      reportRes.data?.forEach?.((r) => cacheReport({ ...r, offlineAvailable: true }));
-      return { ...snapshot, offline: false };
-    } catch (err) {
-      if (!err?.response && !isNetworkOnline()) {
-        return loadOfflineDashboard(userId);
-      }
-      throw err;
-    }
-  }
-
-  return loadOfflineDashboard(userId);
 };
 
 export const loadOfflineDashboard = async (userId) => {

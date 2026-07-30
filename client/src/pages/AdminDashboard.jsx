@@ -184,13 +184,26 @@ const progressionTrend = [
   { day: "Day 7", fever: 98, risk: 35 },
 ];
 
+const dedupeAlertsByPatient = (alerts = []) => {
+  const seen = new Map();
+  alerts.forEach((alert) => {
+    const key = String(
+      alert.patientId || alert.patientEmail || alert.patientName || alert.id
+    );
+    if (!seen.has(key)) {
+      seen.set(key, alert);
+    }
+  });
+  return Array.from(seen.values());
+};
+
 const groupRecordsByPatient = (records = []) => {
   const grouped = new Map();
 
   records.forEach((record) => {
-    const email = record?.user?.email ? String(record.user.email).toLowerCase() : "";
     const userId = record?.user?._id || record?.user || record?.userId || record?.user_id;
-    const key = email || String(userId || record._id);
+    const email = record?.user?.email ? String(record.user.email).toLowerCase() : "";
+    const key = userId ? String(userId) : email || String(record._id);
 
     if (!grouped.has(key)) {
       grouped.set(key, { key, history: [] });
@@ -481,7 +494,7 @@ const AdminDashboard = () => {
   };
 
   const handleUpdateRecord = async () => {
-    if (!selectedPatient?.latest?._id) return;
+    if (!selectedPatient?.latest?._id || selectedPatient?.latest?.isMonitoringPlaceholder) return;
     setIsWorking(true);
     try {
       await api.patch(`/admin/records/${selectedPatient.latest._id}`, {
@@ -532,7 +545,7 @@ const AdminDashboard = () => {
   };
 
   const handleFlagCritical = async () => {
-    if (!selectedPatient?.latest?._id) return;
+    if (!selectedPatient?.latest?._id || selectedPatient?.latest?.isMonitoringPlaceholder) return;
     setIsWorking(true);
     try {
       await api.post(`/admin/records/${selectedPatient.latest._id}/flag-critical`);
@@ -549,7 +562,7 @@ const AdminDashboard = () => {
   };
 
   const handleMarkRecovered = async () => {
-    if (!selectedPatient?.latest?._id) return;
+    if (!selectedPatient?.latest?._id || selectedPatient?.latest?.isMonitoringPlaceholder) return;
     setIsWorking(true);
     try {
       await api.post(`/admin/records/${selectedPatient.latest._id}/mark-recovered`);
@@ -566,7 +579,7 @@ const AdminDashboard = () => {
   };
 
   const handleFlagSevere = async () => {
-    if (!selectedPatient?.latest?._id) return;
+    if (!selectedPatient?.latest?._id || selectedPatient?.latest?.isMonitoringPlaceholder) return;
     setIsWorking(true);
     try {
       await api.patch(`/admin/records/${selectedPatient.latest._id}`, {
@@ -616,7 +629,7 @@ const AdminDashboard = () => {
   };
 
   const requestDeleteRecord = () => {
-    if (!selectedPatient?.latest?._id) return;
+    if (!selectedPatient?.latest?._id || selectedPatient?.latest?.isMonitoringPlaceholder) return;
     setConfirmDialog({
       type: "record",
       title: "Delete latest record?",
@@ -664,8 +677,11 @@ const AdminDashboard = () => {
       timestamp: record.date,
     }));
 
-  const displayCriticalPatients =
-    criticalPatientAlerts.length > 0 ? criticalPatientAlerts : demoCriticalPatientAlerts;
+  const displayCriticalPatients = useMemo(() => {
+    const source =
+      criticalPatientAlerts.length > 0 ? criticalPatientAlerts : demoCriticalPatientAlerts;
+    return dedupeAlertsByPatient(source);
+  }, [criticalPatientAlerts]);
 
   const patientGroups = useMemo(() => groupRecordsByPatient(sourceRecords), [sourceRecords]);
 
@@ -725,31 +741,34 @@ const AdminDashboard = () => {
   }, [page, pageCount]);
 
   const casesPerDay = useMemo(() => {
-    const bucket = sourceRecords.reduce((acc, record) => {
-      const key = formatDateLabel(record.date);
+    const bucket = patientRows.reduce((acc, row) => {
+      const key = formatDateLabel(row.latest?.date || row.latest?.updatedAt);
+      if (!key) return acc;
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {});
     return Object.entries(bucket).map(([date, count]) => ({ date, count }));
-  }, [sourceRecords]);
+  }, [patientRows]);
 
   const criticalTrend = useMemo(() => {
-    const bucket = sourceRecords.reduce((acc, record) => {
-      const key = formatDateLabel(record.date);
-      const score = Number(record?.computed?.riskScore || 0);
-      if (score >= 85) acc[key] = (acc[key] || 0) + 1;
+    const bucket = patientRows.reduce((acc, row) => {
+      const score = Number(row.riskScore || 0);
+      if (score < 85) return acc;
+      const key = formatDateLabel(row.latest?.date || row.latest?.updatedAt);
+      if (!key) return acc;
+      acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {});
     return Object.entries(bucket).map(([date, critical]) => ({ date, critical }));
-  }, [sourceRecords]);
+  }, [patientRows]);
 
   const pregnancyDistribution = useMemo(() => {
     let pregnantHigh = 0;
     let pregnantOther = 0;
     let nonPregnant = 0;
-    sourceRecords.forEach((record) => {
-      const score = Number(record?.computed?.riskScore || 0);
-      if (record.pregnancyStatus) {
+    patientRows.forEach((row) => {
+      const score = Number(row.riskScore || 0);
+      if (row.latest?.pregnancyStatus) {
         if (score >= 50) pregnantHigh += 1;
         else pregnantOther += 1;
       } else {
@@ -761,7 +780,7 @@ const AdminDashboard = () => {
       { name: "Pregnant Moderate/Low", value: pregnantOther },
       { name: "Non-Pregnant", value: nonPregnant },
     ];
-  }, [sourceRecords]);
+  }, [patientRows]);
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-6">
@@ -832,7 +851,7 @@ const AdminDashboard = () => {
               )}
               {displayCriticalPatients.map((alert) => (
                 <CriticalPatientAlertCard
-                  key={alert.id}
+                  key={String(alert.patientId || alert.id)}
                   alert={alert}
                   onOpenPatient={openPatientFromCriticalAlert}
                 />

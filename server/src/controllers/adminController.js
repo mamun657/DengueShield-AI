@@ -51,16 +51,28 @@ const getAdminOverview = async (_req, res) => {
 };
 
 const getAdminAlerts = async (_req, res) => {
-  const alerts = await HealthRecord.find({ "computed.riskScore": { $gte: 70 } })
-    .populate("user", "name email")
-    .sort({ "computed.riskScore": -1, date: -1 })
-    .limit(12)
-    .lean();
+  const alerts = await HealthRecord.aggregate([
+    { $match: { "computed.riskScore": { $gte: 70 } } },
+    { $sort: { "computed.riskScore": -1, date: -1 } },
+    { $group: { _id: "$user", record: { $first: "$$ROOT" } } },
+    { $replaceRoot: { newRoot: "$record" } },
+    { $sort: { "computed.riskScore": -1, date: -1 } },
+    { $limit: 12 },
+    {
+      $lookup: {
+        from: "users",
+        localField: "user",
+        foreignField: "_id",
+        as: "userDoc",
+      },
+    },
+    { $unwind: { path: "$userDoc", preserveNullAndEmptyArrays: true } },
+  ]);
 
   return res.json(
     alerts.map((record) => ({
       id: record._id,
-      patientName: record.user?.name || "Unknown",
+      patientName: record.userDoc?.name || "Unknown",
       riskScore: record.computed?.riskScore || 0,
       symptoms: record.symptoms || [],
       timestamp: record.date,
@@ -75,10 +87,63 @@ const getAllUsers = async (_req, res) => {
 };
 
 const getAllHealthRecords = async (_req, res) => {
-  const records = await HealthRecord.find()
-    .populate("user", "name email role isActive pregnancyStatus emergencyContact")
-    .sort({ date: -1 });
-  res.json(records);
+  const [users, latestRecords] = await Promise.all([
+    User.find({ role: "user", isActive: { $ne: false } })
+      .select("name email role isActive pregnancyStatus emergencyContact createdAt updatedAt")
+      .sort({ createdAt: -1 })
+      .lean(),
+    HealthRecord.aggregate([
+      { $sort: { date: -1, createdAt: -1 } },
+      {
+        $group: {
+          _id: "$user",
+          recordId: { $first: "$_id" },
+        },
+      },
+      {
+        $lookup: {
+          from: "healthrecords",
+          localField: "recordId",
+          foreignField: "_id",
+          as: "record",
+        },
+      },
+      { $unwind: "$record" },
+      { $replaceRoot: { newRoot: "$record" } },
+    ]),
+  ]);
+
+  const recordByUserId = new Map(
+    latestRecords.map((record) => [String(record.user), record])
+  );
+
+  const merged = users.map((user) => {
+    const record = recordByUserId.get(String(user._id));
+    if (record) {
+      return { ...record, user };
+    }
+
+    return {
+      _id: `placeholder-${user._id}`,
+      user,
+      dayOfIllness: 0,
+      temperature: null,
+      symptoms: [],
+      pregnancyStatus: user.pregnancyStatus || false,
+      computed: { riskScore: 0, riskLevel: "Low" },
+      date: user.createdAt,
+      updatedAt: user.updatedAt || user.createdAt,
+      isMonitoringPlaceholder: true,
+    };
+  });
+
+  merged.sort(
+    (a, b) =>
+      new Date(b.updatedAt || b.date || 0).getTime() -
+      new Date(a.updatedAt || a.date || 0).getTime()
+  );
+
+  res.json(merged);
 };
 
 const updateUserByAdmin = async (req, res) => {
@@ -184,14 +249,23 @@ const markRecordRecovered = async (req, res) => {
  * Active critical patients flagged by the Critical Patient Agent (unresolved alerts).
  */
 const getCriticalPatientAlerts = async (_req, res) => {
-  const alerts = await CriticalAlert.find({
-    classification: "critical",
-    resolved: false,
-  })
-    .populate("patientId", "name email")
-    .sort({ riskScore: -1, createdAt: -1 })
-    .limit(24)
-    .lean();
+  const alerts = await CriticalAlert.aggregate([
+    { $match: { classification: "critical", resolved: false } },
+    { $sort: { riskScore: -1, createdAt: -1 } },
+    { $group: { _id: "$patientId", alert: { $first: "$$ROOT" } } },
+    { $replaceRoot: { newRoot: "$alert" } },
+    { $sort: { riskScore: -1, createdAt: -1 } },
+    { $limit: 24 },
+    {
+      $lookup: {
+        from: "users",
+        localField: "patientId",
+        foreignField: "_id",
+        as: "patientDoc",
+      },
+    },
+    { $unwind: { path: "$patientDoc", preserveNullAndEmptyArrays: true } },
+  ]);
 
   return res.json(
     alerts.map((alert) => {
@@ -200,9 +274,9 @@ const getCriticalPatientAlerts = async (_req, res) => {
 
       return {
         id: alert._id,
-        patientId: alert.patientId?._id || alert.patientId,
-        patientName: alert.patientId?.name || "Unknown",
-        patientEmail: alert.patientId?.email || "",
+        patientId: alert.patientId,
+        patientName: alert.patientDoc?.name || "Unknown",
+        patientEmail: alert.patientDoc?.email || "",
         riskScore: alert.riskScore,
         riskTrend: alert.riskTrend || [],
         riskTrendLabel: trendLabel,

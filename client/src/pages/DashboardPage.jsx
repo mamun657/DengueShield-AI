@@ -325,7 +325,8 @@ const DashboardPage = () => {
   const [reports, setReports] = useState([]);
   const [hospitals, setHospitals] = useState([]);
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
   const [predictionError, setPredictionError] = useState("");
   const [predictionNotice, setPredictionNotice] = useState("");
   const [predictionLoading, setPredictionLoading] = useState(false);
@@ -340,6 +341,7 @@ const DashboardPage = () => {
   const [gradcamImageUrl, setGradcamImageUrl] = useState("");
   const [originalRashImageUrl, setOriginalRashImageUrl] = useState("");
   const rashInputRef = useRef(null);
+  const dashboardLoadRef = useRef(null);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -438,46 +440,56 @@ const DashboardPage = () => {
   };
 
   const load = async () => {
-    try {
-      setError("");
-      setIsLoading(true);
-      const uid = offlineUserId || user?._id || user?.id;
-      const { dashboard: dashboardData, reports: reportData, offline } =
-        await loadDashboardData(uid);
-
-      setDashboard(dashboardData);
-      setReports(reportData);
-      if (offline) {
-        setPredictionNotice("Showing cached / offline data — will sync when online.");
-      }
-
-      const recordCount = dashboardData?.records?.length || 0;
-      const tracking = normalizeTrackingRecords(dashboardData?.records || [], recordCount || 1);
-      hydrateFromDashboard({ dashboard: dashboardData, reports: reportData, tracking });
-      setLatestTracking(tracking);
-      if (dashboardData?.latestAssessment) {
-        setLatestAssessment(dashboardData.latestAssessment);
-        setCurrentRisk(dashboardData.latestAssessment);
-      }
-
-      const latestRecord = (dashboardData?.records || []).slice(-1)[0];
-      if (latestRecord) {
-        console.log(
-          "[Dashboard] latestRecord",
-          latestRecord._id || latestRecord.localId,
-          "riskScore",
-          latestRecord?.computed?.riskScore,
-          "source",
-          latestRecord?.computed?.riskSource,
-          "offline",
-          !!offline
-        );
-      }
-    } catch (err) {
-      setError(err?.response?.data?.message || "Unable to load dashboard data.");
-    } finally {
-      setIsLoading(false);
+    if (dashboardLoadRef.current) {
+      return dashboardLoadRef.current;
     }
+
+    const loadPromise = (async () => {
+      try {
+        setError("");
+        setIsDashboardLoading(true);
+        const uid = offlineUserId || user?._id || user?.id;
+        const { dashboard: dashboardData, reports: reportData, offline } =
+          await loadDashboardData(uid);
+
+        setDashboard(dashboardData);
+        setReports(reportData);
+        if (offline) {
+          setPredictionNotice("Showing cached / offline data — will sync when online.");
+        }
+
+        const recordCount = dashboardData?.records?.length || 0;
+        const tracking = normalizeTrackingRecords(dashboardData?.records || [], recordCount || 1);
+        hydrateFromDashboard({ dashboard: dashboardData, reports: reportData, tracking });
+        setLatestTracking(tracking);
+        if (dashboardData?.latestAssessment) {
+          setLatestAssessment(dashboardData.latestAssessment);
+          setCurrentRisk(dashboardData.latestAssessment);
+        }
+
+        const latestRecord = (dashboardData?.records || []).slice(-1)[0];
+        if (latestRecord) {
+          console.log(
+            "[Dashboard] latestRecord",
+            latestRecord._id || latestRecord.localId,
+            "riskScore",
+            latestRecord?.computed?.riskScore,
+            "source",
+            latestRecord?.computed?.riskSource,
+            "offline",
+            !!offline
+          );
+        }
+      } catch (err) {
+        setError(err?.response?.data?.message || "Unable to load dashboard data.");
+      } finally {
+        setIsDashboardLoading(false);
+        dashboardLoadRef.current = null;
+      }
+    })();
+
+    dashboardLoadRef.current = loadPromise;
+    return loadPromise;
   };
 
   useEffect(() => {
@@ -876,10 +888,16 @@ const DashboardPage = () => {
             </div>
             {trackingSource.length === 0 && (
               <p className="text-sm text-gray-400">
-                No tracking history yet. Save a daily record to start tracking.
+                {isDashboardLoading
+                  ? "Loading tracking history…"
+                  : "No tracking history yet. Save a daily record to start tracking."}
               </p>
             )}
-            <TrendChart records={trackingSource} />
+            {isDashboardLoading && trackingSource.length === 0 ? (
+              <div className="mt-4 h-48 animate-pulse rounded-xl border border-white/10 bg-white/5" />
+            ) : (
+              <TrendChart records={trackingSource} />
+            )}
           </section>
 
           <section className={cardClass}>
@@ -914,10 +932,10 @@ const DashboardPage = () => {
             </div>
             
             <div className="space-y-4">
-              {isLoading && reports.length === 0 && (
+              {isDashboardLoading && reports.length === 0 && (
                 <p className="text-sm text-gray-400 text-center py-6 bg-white/5 rounded-xl border border-white/10 animate-pulse">Loading reports...</p>
               )}
-              {!isLoading && reports.length === 0 && (
+              {!isDashboardLoading && reports.length === 0 && (
                 <p className="text-sm text-gray-400 text-center py-6 bg-white/5 rounded-xl border border-white/10">No reports generated yet.</p>
               )}
 

@@ -18,7 +18,7 @@ const RegisterPage = () => {
     setError("");
     setIsSubmitting(true);
     try {
-      const { data } = await api.post("/auth/register", form);
+      const { data } = await api.post("/auth/register", form, { timeout: 15000 });
       login(data);
       navigate("/dashboard");
     } catch (err) {

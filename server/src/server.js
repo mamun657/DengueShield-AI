@@ -11,12 +11,6 @@ const PORT = process.env.PORT || 5000;
 
 const bootstrap = async () => {
   await connectDB();
-  const neo4j = await verifyConnectivity();
-  if (neo4j.ok) {
-    console.log(`Neo4j connected (${neo4j.uri}) — GraphRAG engine ready`);
-  } else {
-    console.warn(`Neo4j unavailable (${neo4j.error}) — GraphRAG will use in-memory fallback`);
-  }
 
   const server = http.createServer(app);
   const io = new Server(server, {
@@ -33,6 +27,19 @@ const bootstrap = async () => {
     console.log(`Server running on port ${PORT}`);
     console.log("[Socket] Messaging realtime enabled");
   });
+
+  // Neo4j is only needed for GraphRAG — do not block HTTP startup on it.
+  verifyConnectivity()
+    .then((neo4j) => {
+      if (neo4j.ok) {
+        console.log(`Neo4j connected (${neo4j.uri}) — GraphRAG engine ready`);
+      } else {
+        console.warn(`Neo4j unavailable (${neo4j.error}) — GraphRAG will use in-memory fallback`);
+      }
+    })
+    .catch((error) => {
+      console.warn(`Neo4j connectivity check failed: ${error.message}`);
+    });
 };
 
 bootstrap().catch((error) => {

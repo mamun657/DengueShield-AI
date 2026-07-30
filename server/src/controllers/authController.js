@@ -26,7 +26,7 @@ const register = async (req, res) => {
     }
 
     const normalizedEmail = normalizeEmail(email);
-    const exists = await User.findOne({ email: normalizedEmail });
+    const exists = await User.exists({ email: normalizedEmail });
     if (exists) return res.status(409).json({ message: "Email already in use" });
 
     const user = await User.create({
@@ -36,10 +36,6 @@ const register = async (req, res) => {
       role: role || "user",
     });
     const resolvedPhotoUrl = resolvePhotoUrl(req, user.photoUrl);
-    console.log("[Profile Photo] register", {
-      stored: user.photoUrl,
-      resolved: resolvedPhotoUrl,
-    });
     return res.status(201).json({
       token: signToken(user._id, user.role),
       user: {
@@ -75,10 +71,6 @@ const login = async (req, res) => {
     if (!match) return res.status(401).json({ message: "Invalid credentials" });
 
     const resolvedPhotoUrl = resolvePhotoUrl(req, user.photoUrl);
-    console.log("[Profile Photo] login", {
-      stored: user.photoUrl,
-      resolved: resolvedPhotoUrl,
-    });
     return res.json({
       token: signToken(user._id, user.role),
       user: {
