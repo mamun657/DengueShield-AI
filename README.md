@@ -19,10 +19,6 @@
   <img src="https://img.shields.io/badge/Bangla-English-red?style=for-the-badge"/>
 </p>
 
----
-# 🌐 Live Website
-
-🔗 https://dengueshield-ai.onrender.com/
 
 ---
 
