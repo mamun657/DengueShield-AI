@@ -441,16 +441,7 @@ Built with the vision of making AI-powered healthcare support more accessible, e
 
 ---
 
-## 👥 Team Members
 
-| Name | Role |
-|------|------|
-| **Mohammed Minul Islam** (🇧🇩) | Team Leader / Project Coordinator |
-| **Mir Mohammed Farhad** (🇧🇩) | Business Analyst / Data Scientist |
-| **Shamsul Huda Md Nahian** (🇧🇩) | UI/UX / Frontend Developer |
-| **Ammar Bin Manjur** (🇺🇸) | Presentation / Communication Lead |
-
----
 
 # 📬 Contact
 
